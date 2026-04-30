@@ -126,3 +126,11 @@ data class LoadedPuzzle(
     val outlineSegments: List<OutlineSegment>,
     val worldBounds: PuzzleBounds,
 )
+
+data class PuzzleSession(
+    val selectedPaletteId: Int? = null,
+    val fillsByRegionId: Map<Int, Int> = emptyMap(),
+) {
+    val filledCount: Int
+        get() = fillsByRegionId.size
+}

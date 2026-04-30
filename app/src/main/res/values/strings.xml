@@ -1,7 +1,10 @@
 <resources>
     <string name="app_name">ColorByNumber</string>
     <string name="coloring_title">Coloring</string>
-    <string name="coloring_subtitle">Bundled puzzle preview for Step 1</string>
+    <string name="coloring_subtitle">Select a palette color, then tap matching numbered regions.</string>
     <string name="palette_title">Palette</string>
     <string name="coloring_load_failed">Failed to load the sample puzzle.</string>
+    <string name="coloring_progress">Progress: %1$d/%2$d regions filled</string>
+    <string name="coloring_selected_palette">Selected color: %1$d - %2$s</string>
+    <string name="coloring_no_palette_selected">Selected color: none</string>
 </resources>

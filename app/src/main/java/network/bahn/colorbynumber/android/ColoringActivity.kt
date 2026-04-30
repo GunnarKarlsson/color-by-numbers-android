@@ -5,8 +5,11 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -28,8 +31,10 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
@@ -38,15 +43,18 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.DrawScope
-import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.nativeCanvas
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.onSizeChanged
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import network.bahn.colorbynumber.android.coloring.LoadedPuzzle
@@ -55,6 +63,8 @@ import network.bahn.colorbynumber.android.coloring.PaletteColor
 import network.bahn.colorbynumber.android.coloring.PuzzleAssetLoader
 import network.bahn.colorbynumber.android.coloring.PuzzleBounds
 import network.bahn.colorbynumber.android.coloring.PuzzlePoint
+import network.bahn.colorbynumber.android.coloring.PuzzleSession
+import network.bahn.colorbynumber.android.coloring.PuzzleTopology
 import network.bahn.colorbynumber.android.ui.theme.ColorByNumberTheme
 
 private const val SAMPLE_PUZZLE_ASSET = "puzzles/topology_new_3.cbn"
@@ -154,6 +164,10 @@ private fun PuzzleContent(
     puzzle: LoadedPuzzle,
     modifier: Modifier = Modifier,
 ) {
+    var session by remember(puzzle) { mutableStateOf(PuzzleSession()) }
+    val paletteById = remember(puzzle.palette) { puzzle.palette.associateBy { it.id } }
+    val selectedPalette = session.selectedPaletteId?.let { paletteById[it] }
+
     Column(
         modifier = modifier
             .fillMaxSize()
@@ -164,6 +178,23 @@ private fun PuzzleContent(
             text = stringResource(R.string.coloring_subtitle),
             style = MaterialTheme.typography.bodyMedium,
         )
+        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Text(
+                text = stringResource(
+                    R.string.coloring_progress,
+                    session.filledCount,
+                    puzzle.renderRegions.size,
+                ),
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = FontWeight.SemiBold,
+            )
+            Text(
+                text = selectedPalette?.let {
+                    stringResource(R.string.coloring_selected_palette, it.id, it.label)
+                } ?: stringResource(R.string.coloring_no_palette_selected),
+                style = MaterialTheme.typography.bodyMedium,
+            )
+        }
         Surface(
             modifier = Modifier
                 .fillMaxWidth()
@@ -173,22 +204,57 @@ private fun PuzzleContent(
         ) {
             PuzzleCanvas(
                 puzzle = puzzle,
+                session = session,
+                paletteById = paletteById,
+                onPuzzleTapped = { worldPoint ->
+                    val selectedPaletteId = session.selectedPaletteId ?: return@PuzzleCanvas
+                    val hitRegion = PuzzleTopology.hitTestRegion(puzzle.renderRegions, worldPoint) ?: return@PuzzleCanvas
+                    val targetPaletteId = hitRegion.region.targetPaletteId ?: return@PuzzleCanvas
+
+                    if (targetPaletteId == selectedPaletteId) {
+                        session = session.copy(
+                            fillsByRegionId = session.fillsByRegionId + (hitRegion.region.id to selectedPaletteId),
+                        )
+                    }
+                },
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(12.dp),
             )
         }
-        PaletteStrip(colors = puzzle.palette)
+        PaletteStrip(
+            colors = puzzle.palette,
+            selectedPaletteId = session.selectedPaletteId,
+            onPaletteSelected = { paletteId ->
+                session = session.copy(selectedPaletteId = paletteId)
+            },
+        )
     }
 }
 
 @Composable
 private fun PuzzleCanvas(
     puzzle: LoadedPuzzle,
+    session: PuzzleSession,
+    paletteById: Map<Int, PaletteColor>,
+    onPuzzleTapped: (PuzzlePoint) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val density = LocalDensity.current
     val numberTextSize = 18.sp
+    val canvasPaddingPx = with(density) { 24.dp.toPx() }
+    var canvasSize by remember { mutableStateOf(IntSize.Zero) }
+    val transform = remember(canvasSize, puzzle.worldBounds, canvasPaddingPx) {
+        if (canvasSize == IntSize.Zero) {
+            null
+        } else {
+            ScreenTransform.fit(
+                canvasSize = Size(canvasSize.width.toFloat(), canvasSize.height.toFloat()),
+                bounds = puzzle.worldBounds,
+                padding = canvasPaddingPx,
+            )
+        }
+    }
     val textPaint = remember(density) {
         Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = android.graphics.Color.BLACK
@@ -198,34 +264,42 @@ private fun PuzzleCanvas(
         }
     }
 
-    androidx.compose.foundation.Canvas(modifier = modifier) {
+    Canvas(
+        modifier = modifier
+            .onSizeChanged { canvasSize = it }
+            .pointerInput(transform, puzzle.renderRegions) {
+                detectTapGestures { offset ->
+                    val currentTransform = transform ?: return@detectTapGestures
+                    onPuzzleTapped(currentTransform.toWorld(offset))
+                }
+            },
+    ) {
         drawRect(color = Color.White)
 
-        val transform = ScreenTransform.fit(
-            canvasSize = size,
-            bounds = puzzle.worldBounds,
-            padding = 24.dp.toPx(),
-        )
+        val currentTransform = transform ?: return@Canvas
 
         puzzle.renderRegions.forEach { renderRegion ->
-            val path = polygonPath(renderRegion.polygon, transform)
+            val fillColor = session.fillsByRegionId[renderRegion.region.id]
+                ?.let { paletteById[it]?.composeColor }
+                ?: Color(0xFFF7F7F7)
+            val path = polygonPath(renderRegion.polygon, currentTransform)
             drawPath(
                 path = path,
-                color = Color(0xFFF7F7F7),
+                color = fillColor,
             )
         }
 
         puzzle.renderRegions.forEach { renderRegion ->
             drawCenteredText(
                 text = renderRegion.region.number.toString(),
-                point = transform.toScreen(renderRegion.region.numberPosition),
+                point = currentTransform.toScreen(renderRegion.region.numberPosition),
                 paint = textPaint,
                 textSize = numberTextSize,
             )
         }
 
         puzzle.outlineSegments.forEach { segment ->
-            drawOutline(segment, transform)
+            drawOutline(segment, currentTransform)
         }
     }
 }
@@ -266,7 +340,11 @@ private fun polygonPath(points: List<PuzzlePoint>, transform: ScreenTransform): 
 }
 
 @Composable
-private fun PaletteStrip(colors: List<PaletteColor>) {
+private fun PaletteStrip(
+    colors: List<PaletteColor>,
+    selectedPaletteId: Int?,
+    onPaletteSelected: (Int) -> Unit,
+) {
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Text(
             text = stringResource(R.string.palette_title),
@@ -284,12 +362,15 @@ private fun PaletteStrip(colors: List<PaletteColor>) {
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.spacedBy(6.dp),
                 ) {
+                    val isSelected = selectedPaletteId == paletteColor.id
                     Box(
                         modifier = Modifier
+                            .clip(MaterialTheme.shapes.small)
+                            .clickable { onPaletteSelected(paletteColor.id) }
                             .size(40.dp)
                             .border(
-                                width = 1.dp,
-                                color = MaterialTheme.colorScheme.outline,
+                                width = if (isSelected) 3.dp else 1.dp,
+                                color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline,
                                 shape = MaterialTheme.shapes.small,
                             )
                             .background(
@@ -300,6 +381,7 @@ private fun PaletteStrip(colors: List<PaletteColor>) {
                     Text(
                         text = paletteColor.id.toString(),
                         style = MaterialTheme.typography.labelMedium,
+                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
                     )
                 }
             }
@@ -318,6 +400,12 @@ private data class ScreenTransform(
         Offset(
             x = translateX + ((point.x - bounds.minX) * scale),
             y = translateY + ((point.y - bounds.minY) * scale),
+        )
+
+    fun toWorld(point: Offset): PuzzlePoint =
+        PuzzlePoint(
+            x = ((point.x - translateX) / scale) + bounds.minX,
+            y = ((point.y - translateY) / scale) + bounds.minY,
         )
 
     companion object {

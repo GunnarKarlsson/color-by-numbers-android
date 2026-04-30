@@ -2,6 +2,8 @@ package network.bahn.colorbynumber.android.coloring
 
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class PuzzleTopologyTest {
@@ -64,5 +66,48 @@ class PuzzleTopologyTest {
 
         assertEquals(1, segments.size)
         assertEquals(OutlineSegment(PuzzlePoint(0f, 0f), PuzzlePoint(10f, 0f)), segments.single())
+    }
+
+    @Test
+    fun `pointInPolygon identifies points inside the region`() {
+        val polygon = listOf(
+            PuzzlePoint(0f, 0f),
+            PuzzlePoint(10f, 0f),
+            PuzzlePoint(10f, 10f),
+            PuzzlePoint(0f, 10f),
+        )
+
+        assertTrue(PuzzleTopology.pointInPolygon(PuzzlePoint(5f, 5f), polygon))
+        assertEquals(false, PuzzleTopology.pointInPolygon(PuzzlePoint(15f, 5f), polygon))
+    }
+
+    @Test
+    fun `hitTestRegion returns matching render region`() {
+        val region = RenderRegion(
+            region = PuzzleRegion(
+                id = 7,
+                number = 3,
+                numberPosition = PuzzlePoint(5f, 5f),
+                targetPaletteId = 2,
+            ),
+            polygon = listOf(
+                PuzzlePoint(0f, 0f),
+                PuzzlePoint(10f, 0f),
+                PuzzlePoint(10f, 10f),
+                PuzzlePoint(0f, 10f),
+            ),
+        )
+
+        val hit = PuzzleTopology.hitTestRegion(
+            renderRegions = listOf(region),
+            point = PuzzlePoint(4f, 4f),
+        )
+        val miss = PuzzleTopology.hitTestRegion(
+            renderRegions = listOf(region),
+            point = PuzzlePoint(20f, 20f),
+        )
+
+        assertEquals(region, hit)
+        assertNull(miss)
     }
 }

@@ -78,4 +78,38 @@ object PuzzleTopology {
             OutlineSegment(start = start, end = end)
         }
     }
+
+    fun hitTestRegion(renderRegions: List<RenderRegion>, point: PuzzlePoint): RenderRegion? =
+        renderRegions.firstOrNull { region -> pointInPolygon(point, region.polygon) }
+
+    fun pointInPolygon(point: PuzzlePoint, polygon: List<PuzzlePoint>): Boolean {
+        if (polygon.size < 3) {
+            return false
+        }
+
+        var inside = false
+        var previousIndex = polygon.lastIndex
+
+        for (currentIndex in polygon.indices) {
+            val current = polygon[currentIndex]
+            val previous = polygon[previousIndex]
+
+            val intersects = ((current.y > point.y) != (previous.y > point.y)) &&
+                (
+                    point.x <
+                        ((previous.x - current.x) * (point.y - current.y) / ((previous.y - current.y) + EPSILON)) +
+                        current.x
+                    )
+
+            if (intersects) {
+                inside = !inside
+            }
+
+            previousIndex = currentIndex
+        }
+
+        return inside
+    }
+
+    private const val EPSILON = 0.00001f
 }
