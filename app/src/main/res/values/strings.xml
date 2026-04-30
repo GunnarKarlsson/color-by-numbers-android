@@ -1,6 +1,8 @@
 <resources>
     <string name="app_name">ColorByNumber</string>
     <string name="image_grid_title">Choose a puzzle</string>
+    <string name="image_grid_progress">%1$d/%2$d filled</string>
+    <string name="image_grid_progress_loading">Loading progress…</string>
     <string name="coloring_title">Coloring</string>
     <string name="coloring_subtitle">Select a palette color, then tap matching numbered regions.</string>
     <string name="palette_title">Palette</string>

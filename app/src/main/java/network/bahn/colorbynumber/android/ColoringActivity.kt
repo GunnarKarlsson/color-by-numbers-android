@@ -131,11 +131,12 @@ private fun ColoringRoute(puzzleItem: PuzzleListItem) {
 
     ColoringScreen(
         state = state,
-        onSessionPersisted = { assetPath, session ->
+        onSessionPersisted = { assetPath, totalRegions, session ->
             coroutineScope.launch(Dispatchers.IO) {
                 progressStore.saveProgress(
                     assetPath = assetPath,
                     fillsByRegionId = session.fillsByRegionId,
+                    totalRegions = totalRegions,
                 )
             }
         },
@@ -146,7 +147,7 @@ private fun ColoringRoute(puzzleItem: PuzzleListItem) {
 @OptIn(ExperimentalMaterial3Api::class)
 private fun ColoringScreen(
     state: ColoringUiState,
-    onSessionPersisted: (String, PuzzleSession) -> Unit,
+    onSessionPersisted: (String, Int, PuzzleSession) -> Unit,
 ) {
     Scaffold(
         topBar = {
@@ -210,12 +211,13 @@ private fun PuzzleContent(
     puzzleAssetPath: String,
     puzzle: LoadedPuzzle,
     initialSession: PuzzleSession,
-    onSessionPersisted: (String, PuzzleSession) -> Unit,
+    onSessionPersisted: (String, Int, PuzzleSession) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     var session by remember(puzzle, initialSession) { mutableStateOf(initialSession) }
     val paletteById = remember(puzzle.palette) { puzzle.palette.associateBy { it.id } }
     val selectedPalette = session.selectedPaletteId?.let { paletteById[it] }
+    val totalRegions = puzzle.document.regions.size
 
     Column(
         modifier = modifier
@@ -232,7 +234,7 @@ private fun PuzzleContent(
                 text = stringResource(
                     R.string.coloring_progress,
                     session.filledCount,
-                    puzzle.renderRegions.size,
+                    totalRegions,
                 ),
                 style = MaterialTheme.typography.bodyMedium,
                 fontWeight = FontWeight.SemiBold,
@@ -253,7 +255,7 @@ private fun PuzzleContent(
                 onClick = {
                     val clearedSession = PuzzleSession()
                     session = clearedSession
-                    onSessionPersisted(puzzleAssetPath, clearedSession)
+                    onSessionPersisted(puzzleAssetPath, totalRegions, clearedSession)
                 },
             ) {
                 Text(text = stringResource(R.string.coloring_clear_progress))
@@ -280,7 +282,7 @@ private fun PuzzleContent(
                             fillsByRegionId = session.fillsByRegionId + (hitRegion.region.id to selectedPaletteId),
                         )
                         session = updatedSession
-                        onSessionPersisted(puzzleAssetPath, updatedSession)
+                        onSessionPersisted(puzzleAssetPath, totalRegions, updatedSession)
                     }
                 },
                 modifier = Modifier

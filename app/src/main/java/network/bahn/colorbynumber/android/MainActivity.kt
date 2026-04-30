@@ -38,6 +38,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import network.bahn.colorbynumber.android.coloring.PuzzleAssetLoader
+import network.bahn.colorbynumber.android.coloring.PuzzleProgressStore
+import network.bahn.colorbynumber.android.coloring.PuzzleProgressSummary
 import network.bahn.colorbynumber.android.ui.theme.ColorByNumberTheme
 
 class MainActivity : ComponentActivity() {
@@ -60,8 +63,31 @@ class MainActivity : ComponentActivity() {
 private fun PuzzleGridRoute(
     onPuzzleSelected: (PuzzleListItem) -> Unit,
 ) {
+    val context = LocalContext.current
+    val loader = androidx.compose.runtime.remember(context) { PuzzleAssetLoader(context) }
+    val progressStore = androidx.compose.runtime.remember(context) { PuzzleProgressStore(context.filesDir) }
+    val progressByPuzzleId by produceState<Map<String, PuzzleProgressSummary>>(
+        initialValue = emptyMap(),
+        context,
+        loader,
+        progressStore,
+    ) {
+        value = withContext(Dispatchers.IO) {
+            PuzzleCatalog.items.associate { puzzle ->
+                val totalRegions = loader.load(puzzle.puzzleAssetPath).document.regions.size
+                val summary = progressStore.loadProgressSummary(puzzle.puzzleAssetPath)
+                    ?: PuzzleProgressSummary(
+                        completedRegions = 0,
+                        totalRegions = totalRegions,
+                    )
+                puzzle.id to summary
+            }
+        }
+    }
+
     PuzzleGridScreen(
         puzzles = PuzzleCatalog.items,
+        progressByPuzzleId = progressByPuzzleId,
         onPuzzleSelected = onPuzzleSelected,
     )
 }
@@ -70,6 +96,7 @@ private fun PuzzleGridRoute(
 @OptIn(ExperimentalMaterial3Api::class)
 private fun PuzzleGridScreen(
     puzzles: List<PuzzleListItem>,
+    progressByPuzzleId: Map<String, PuzzleProgressSummary>,
     onPuzzleSelected: (PuzzleListItem) -> Unit,
 ) {
     Scaffold(
@@ -93,6 +120,7 @@ private fun PuzzleGridScreen(
             items(puzzles, key = { it.id }) { puzzle ->
                 PuzzleGridCard(
                     puzzle = puzzle,
+                    progressSummary = progressByPuzzleId[puzzle.id],
                     onClick = { onPuzzleSelected(puzzle) },
                 )
             }
@@ -103,6 +131,7 @@ private fun PuzzleGridScreen(
 @Composable
 private fun PuzzleGridCard(
     puzzle: PuzzleListItem,
+    progressSummary: PuzzleProgressSummary?,
     onClick: () -> Unit,
 ) {
     Card(
@@ -121,9 +150,21 @@ private fun PuzzleGridCard(
             )
             Text(
                 text = puzzle.displayName,
-                modifier = Modifier.padding(12.dp),
+                modifier = Modifier.padding(start = 12.dp, end = 12.dp, top = 12.dp, bottom = 4.dp),
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.SemiBold,
+            )
+            Text(
+                text = progressSummary?.let {
+                    stringResource(
+                        R.string.image_grid_progress,
+                        it.completedRegions,
+                        it.totalRegions,
+                    )
+                } ?: stringResource(R.string.image_grid_progress_loading),
+                modifier = Modifier.padding(start = 12.dp, end = 12.dp, bottom = 12.dp),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
     }

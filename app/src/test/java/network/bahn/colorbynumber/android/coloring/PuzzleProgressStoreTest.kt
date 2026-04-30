@@ -17,11 +17,14 @@ class PuzzleProgressStoreTest {
             store.saveProgress(
                 assetPath = "puzzles/topology_new_3.cbn",
                 fillsByRegionId = mapOf(9 to 6, 3 to 4),
+                totalRegions = 8,
             )
 
             val progressFile = store.progressFileFor("puzzles/topology_new_3.cbn")
             assertTrue(progressFile.exists())
             assertEquals("topology_new_3.cbn.progress.json", progressFile.name)
+            assertTrue(progressFile.readText().contains("\"completed_regions\": 2"))
+            assertTrue(progressFile.readText().contains("\"total_regions\": 8"))
             assertTrue(progressFile.readText().contains("\"region_id\": 3"))
             assertTrue(progressFile.readText().contains("\"palette_color_id\": 6"))
         } finally {
@@ -44,6 +47,7 @@ class PuzzleProgressStoreTest {
                     3 to 999,
                     999 to 4,
                 ),
+                totalRegions = 2,
             )
 
             val restored = store.loadProgress("puzzles/sample.cbn", document)
@@ -62,13 +66,35 @@ class PuzzleProgressStoreTest {
             val store = PuzzleProgressStore(tempDir.toFile())
             val assetPath = "puzzles/sample.cbn"
 
-            store.saveProgress(assetPath, mapOf(2 to 2))
+            store.saveProgress(assetPath, mapOf(2 to 2), totalRegions = 2)
             val progressFile = store.progressFileFor(assetPath)
             assertTrue(progressFile.exists())
 
-            store.saveProgress(assetPath, emptyMap())
+            store.saveProgress(assetPath, emptyMap(), totalRegions = 2)
 
             assertFalse(progressFile.exists())
+        } finally {
+            tempDir.toFile().deleteRecursively()
+        }
+    }
+
+    @Test
+    fun `loadProgressSummary returns stored completed and total counts`() {
+        val tempDir = Files.createTempDirectory("puzzle-progress-summary")
+
+        try {
+            val store = PuzzleProgressStore(tempDir.toFile())
+            val assetPath = "puzzles/sample.cbn"
+
+            store.saveProgress(
+                assetPath = assetPath,
+                fillsByRegionId = mapOf(2 to 2, 3 to 4),
+                totalRegions = 5,
+            )
+
+            val summary = store.loadProgressSummary(assetPath)
+
+            assertEquals(PuzzleProgressSummary(completedRegions = 2, totalRegions = 5), summary)
         } finally {
             tempDir.toFile().deleteRecursively()
         }

@@ -9,6 +9,26 @@ import java.io.File
 class PuzzleProgressStore(
     private val baseDirectory: File,
 ) {
+    fun loadProgressSummary(assetPath: String): PuzzleProgressSummary? {
+        val progressFile = progressFileFor(assetPath)
+        if (!progressFile.exists()) {
+            return null
+        }
+
+        val progress = try {
+            gson.fromJson(progressFile.readText(), ProgressFile::class.java)
+        } catch (_: JsonSyntaxException) {
+            return null
+        }
+
+        val completedRegions = progress.completedRegions ?: return null
+        val totalRegions = progress.totalRegions ?: return null
+        return PuzzleProgressSummary(
+            completedRegions = completedRegions,
+            totalRegions = totalRegions,
+        )
+    }
+
     fun loadProgress(assetPath: String, document: PuzzleDocument): Map<Int, Int> {
         val progressFile = progressFileFor(assetPath)
         if (!progressFile.exists()) {
@@ -33,7 +53,7 @@ class PuzzleProgressStore(
         }
     }
 
-    fun saveProgress(assetPath: String, fillsByRegionId: Map<Int, Int>) {
+    fun saveProgress(assetPath: String, fillsByRegionId: Map<Int, Int>, totalRegions: Int) {
         val progressFile = progressFileFor(assetPath)
         if (fillsByRegionId.isEmpty()) {
             progressFile.delete()
@@ -43,6 +63,8 @@ class PuzzleProgressStore(
         progressFile.parentFile?.mkdirs()
         val progress = ProgressFile(
             version = CURRENT_VERSION,
+            completedRegions = fillsByRegionId.size,
+            totalRegions = totalRegions,
             filledRegions = fillsByRegionId.toSortedMap().map { (regionId, paletteColorId) ->
                 RegionFillEntry(
                     regionId = regionId,
@@ -70,6 +92,10 @@ class PuzzleProgressStore(
 private data class ProgressFile(
     @SerializedName("version")
     val version: Int = 1,
+    @SerializedName("completed_regions")
+    val completedRegions: Int? = null,
+    @SerializedName("total_regions")
+    val totalRegions: Int? = null,
     @SerializedName("filled_regions")
     val filledRegions: List<RegionFillEntry>? = emptyList(),
 )
@@ -79,4 +105,9 @@ private data class RegionFillEntry(
     val regionId: Int? = null,
     @SerializedName("palette_color_id")
     val paletteColorId: Int? = null,
+)
+
+data class PuzzleProgressSummary(
+    val completedRegions: Int,
+    val totalRegions: Int,
 )
