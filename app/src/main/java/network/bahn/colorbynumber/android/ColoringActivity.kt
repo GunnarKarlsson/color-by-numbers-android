@@ -12,6 +12,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -332,7 +333,8 @@ private fun PuzzleCanvas(
     val numberTextSize = 18.sp
     val canvasPaddingPx = with(density) { 24.dp.toPx() }
     var canvasSize by remember { mutableStateOf(IntSize.Zero) }
-    val transform = remember(canvasSize, puzzle.worldBounds, canvasPaddingPx) {
+    var viewport by remember(puzzle) { mutableStateOf(PuzzleViewport()) }
+    val baseTransform = remember(canvasSize, puzzle.worldBounds, canvasPaddingPx) {
         if (canvasSize == IntSize.Zero) {
             null
         } else {
@@ -342,6 +344,9 @@ private fun PuzzleCanvas(
                 padding = canvasPaddingPx,
             )
         }
+    }
+    val transform = remember(baseTransform, viewport) {
+        baseTransform?.applyViewport(viewport)
     }
     val textPaint = remember(density) {
         Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -355,6 +360,29 @@ private fun PuzzleCanvas(
     Canvas(
         modifier = modifier
             .onSizeChanged { canvasSize = it }
+            .pointerInput(baseTransform, viewport) {
+                detectTransformGestures { centroid, gesturePan, gestureZoom, _ ->
+                    val currentBaseTransform = baseTransform ?: return@detectTransformGestures
+                    val oldZoom = viewport.zoom
+                    val newZoom = (oldZoom * gestureZoom).coerceIn(MIN_ZOOM, MAX_ZOOM)
+                    val scaleFactor = newZoom / oldZoom
+                    val currentTransform = currentBaseTransform.applyViewport(viewport)
+                    val currentOffset = Offset(currentTransform.offsetX, currentTransform.offsetY)
+                    val baseOffset = Offset(currentBaseTransform.offsetX, currentBaseTransform.offsetY)
+                    val newEffectiveOffset = Offset(
+                        x = centroid.x - ((centroid.x - currentOffset.x) * scaleFactor) + gesturePan.x,
+                        y = centroid.y - ((centroid.y - currentOffset.y) * scaleFactor) + gesturePan.y,
+                    )
+
+                    viewport = PuzzleViewport(
+                        zoom = newZoom,
+                        pan = Offset(
+                            x = newEffectiveOffset.x - baseOffset.x,
+                            y = newEffectiveOffset.y - baseOffset.y,
+                        ),
+                    )
+                }
+            }
             .pointerInput(transform, puzzle.renderRegions) {
                 detectTapGestures { offset ->
                     val currentTransform = transform ?: return@detectTapGestures
@@ -480,20 +508,26 @@ private fun PaletteStrip(
 
 private data class ScreenTransform(
     val scale: Float,
-    val translateX: Float,
-    val translateY: Float,
-    val bounds: PuzzleBounds,
+    val offsetX: Float,
+    val offsetY: Float,
 ) {
     fun toScreen(point: PuzzlePoint): Offset =
         Offset(
-            x = translateX + ((point.x - bounds.minX) * scale),
-            y = translateY + ((point.y - bounds.minY) * scale),
+            x = offsetX + (point.x * scale),
+            y = offsetY + (point.y * scale),
         )
 
     fun toWorld(point: Offset): PuzzlePoint =
         PuzzlePoint(
-            x = ((point.x - translateX) / scale) + bounds.minX,
-            y = ((point.y - translateY) / scale) + bounds.minY,
+            x = (point.x - offsetX) / scale,
+            y = (point.y - offsetY) / scale,
+        )
+
+    fun applyViewport(viewport: PuzzleViewport): ScreenTransform =
+        copy(
+            scale = scale * viewport.zoom,
+            offsetX = offsetX + viewport.pan.x,
+            offsetY = offsetY + viewport.pan.y,
         )
 
     companion object {
@@ -504,15 +538,22 @@ private data class ScreenTransform(
 
             val contentWidth = bounds.width * scale
             val contentHeight = bounds.height * scale
-            val translateX = (canvasSize.width - contentWidth) / 2f
-            val translateY = (canvasSize.height - contentHeight) / 2f
+            val offsetX = ((canvasSize.width - contentWidth) / 2f) - (bounds.minX * scale)
+            val offsetY = ((canvasSize.height - contentHeight) / 2f) - (bounds.minY * scale)
 
             return ScreenTransform(
                 scale = scale,
-                translateX = translateX,
-                translateY = translateY,
-                bounds = bounds,
+                offsetX = offsetX,
+                offsetY = offsetY,
             )
         }
     }
 }
+
+private data class PuzzleViewport(
+    val zoom: Float = 1f,
+    val pan: Offset = Offset.Zero,
+)
+
+private const val MIN_ZOOM = 1f
+private const val MAX_ZOOM = 6f
