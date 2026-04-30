@@ -1,8 +1,8 @@
 package network.bahn.colorbynumber.android
 
 import android.content.Context
-import android.graphics.Paint
 import android.content.Intent
+import android.graphics.Paint
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -24,9 +24,13 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
@@ -80,7 +84,10 @@ class ColoringActivity : ComponentActivity() {
         enableEdgeToEdge()
         setContent {
             ColorByNumberTheme {
-                ColoringRoute(puzzleItem = puzzleItem)
+                ColoringRoute(
+                    puzzleItem = puzzleItem,
+                    onNavigateBack = { finish() },
+                )
             }
         }
     }
@@ -105,7 +112,10 @@ private sealed interface ColoringUiState {
 }
 
 @Composable
-private fun ColoringRoute(puzzleItem: PuzzleListItem) {
+private fun ColoringRoute(
+    puzzleItem: PuzzleListItem,
+    onNavigateBack: () -> Unit,
+) {
     val context = LocalContext.current
     val loader = remember(context) { PuzzleAssetLoader(context) }
     val progressStore = remember(context) { PuzzleProgressStore(context.filesDir) }
@@ -131,6 +141,7 @@ private fun ColoringRoute(puzzleItem: PuzzleListItem) {
 
     ColoringScreen(
         state = state,
+        onNavigateBack = onNavigateBack,
         onSessionPersisted = { assetPath, totalRegions, session ->
             coroutineScope.launch(Dispatchers.IO) {
                 progressStore.saveProgress(
@@ -147,11 +158,20 @@ private fun ColoringRoute(puzzleItem: PuzzleListItem) {
 @OptIn(ExperimentalMaterial3Api::class)
 private fun ColoringScreen(
     state: ColoringUiState,
+    onNavigateBack: () -> Unit,
     onSessionPersisted: (String, Int, PuzzleSession) -> Unit,
 ) {
     Scaffold(
         topBar = {
             CenterAlignedTopAppBar(
+                navigationIcon = {
+                    IconButton(onClick = onNavigateBack) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = stringResource(R.string.coloring_back),
+                        )
+                    }
+                },
                 title = {
                     Text(
                         text = when (state) {
