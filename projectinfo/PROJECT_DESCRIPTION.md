@@ -17,9 +17,9 @@ App flow:
 
 The .cbn images are created in an editor. in this editor, written in Rust, we've already tested the logic for how to render, edit and save images.
 
-See PROJECT_DESCRIPTION.md and rust_implementation_snippets.md for details on implementation.
+See mobile_app_topology_and_android_mvp.md and rust_implementation_snippets.md for details on implementation.
 
-Plan
+Plan Steps:
 
 1. Create ColoringActivity that loads hardcoded topology_new_1.cbn and its palette. Make it show on the screen
 
