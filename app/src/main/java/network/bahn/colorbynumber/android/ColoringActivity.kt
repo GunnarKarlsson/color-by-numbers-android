@@ -26,6 +26,7 @@ import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -225,6 +226,21 @@ private fun PuzzleContent(
                 } ?: stringResource(R.string.coloring_no_palette_selected),
                 style = MaterialTheme.typography.bodyMedium,
             )
+        }
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.End,
+        ) {
+            OutlinedButton(
+                enabled = session.fillsByRegionId.isNotEmpty(),
+                onClick = {
+                    val clearedSession = PuzzleSession()
+                    session = clearedSession
+                    onSessionPersisted(clearedSession)
+                },
+            ) {
+                Text(text = stringResource(R.string.coloring_clear_progress))
+            }
         }
         Surface(
             modifier = Modifier
