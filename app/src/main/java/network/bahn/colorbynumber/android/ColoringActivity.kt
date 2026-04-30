@@ -34,6 +34,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -56,6 +57,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.onSizeChanged
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import network.bahn.colorbynumber.android.coloring.LoadedPuzzle
 import network.bahn.colorbynumber.android.coloring.OutlineSegment
@@ -63,6 +65,7 @@ import network.bahn.colorbynumber.android.coloring.PaletteColor
 import network.bahn.colorbynumber.android.coloring.PuzzleAssetLoader
 import network.bahn.colorbynumber.android.coloring.PuzzleBounds
 import network.bahn.colorbynumber.android.coloring.PuzzlePoint
+import network.bahn.colorbynumber.android.coloring.PuzzleProgressStore
 import network.bahn.colorbynumber.android.coloring.PuzzleSession
 import network.bahn.colorbynumber.android.coloring.PuzzleTopology
 import network.bahn.colorbynumber.android.ui.theme.ColorByNumberTheme
@@ -83,7 +86,11 @@ class ColoringActivity : ComponentActivity() {
 
 private sealed interface ColoringUiState {
     data object Loading : ColoringUiState
-    data class Success(val puzzle: LoadedPuzzle) : ColoringUiState
+    data class Success(
+        val puzzle: LoadedPuzzle,
+        val initialSession: PuzzleSession,
+    ) : ColoringUiState
+
     data class Error(val message: String) : ColoringUiState
 }
 
@@ -91,12 +98,19 @@ private sealed interface ColoringUiState {
 private fun ColoringRoute() {
     val context = LocalContext.current
     val loader = remember(context) { PuzzleAssetLoader(context) }
-    val state by produceState<ColoringUiState>(initialValue = ColoringUiState.Loading, loader) {
+    val progressStore = remember(context) { PuzzleProgressStore(context.filesDir) }
+    val coroutineScope = rememberCoroutineScope()
+    val state by produceState<ColoringUiState>(initialValue = ColoringUiState.Loading, loader, progressStore) {
         value = try {
-            val puzzle = withContext(Dispatchers.IO) {
-                loader.load(SAMPLE_PUZZLE_ASSET)
+            val result = withContext(Dispatchers.IO) {
+                val puzzle = loader.load(SAMPLE_PUZZLE_ASSET)
+                val restoredFills = progressStore.loadProgress(SAMPLE_PUZZLE_ASSET, puzzle.document)
+                ColoringUiState.Success(
+                    puzzle = puzzle,
+                    initialSession = PuzzleSession(fillsByRegionId = restoredFills),
+                )
             }
-            ColoringUiState.Success(puzzle)
+            result
         } catch (error: Exception) {
             ColoringUiState.Error(
                 error.message ?: context.getString(R.string.coloring_load_failed),
@@ -104,12 +118,25 @@ private fun ColoringRoute() {
         }
     }
 
-    ColoringScreen(state = state)
+    ColoringScreen(
+        state = state,
+        onSessionPersisted = { session ->
+            coroutineScope.launch(Dispatchers.IO) {
+                progressStore.saveProgress(
+                    assetPath = SAMPLE_PUZZLE_ASSET,
+                    fillsByRegionId = session.fillsByRegionId,
+                )
+            }
+        },
+    )
 }
 
 @Composable
 @OptIn(ExperimentalMaterial3Api::class)
-private fun ColoringScreen(state: ColoringUiState) {
+private fun ColoringScreen(
+    state: ColoringUiState,
+    onSessionPersisted: (PuzzleSession) -> Unit,
+) {
     Scaffold(
         topBar = {
             CenterAlignedTopAppBar(
@@ -128,6 +155,8 @@ private fun ColoringScreen(state: ColoringUiState) {
 
             is ColoringUiState.Success -> PuzzleContent(
                 puzzle = state.puzzle,
+                initialSession = state.initialSession,
+                onSessionPersisted = onSessionPersisted,
                 modifier = Modifier.padding(innerPadding),
             )
         }
@@ -162,9 +191,11 @@ private fun ErrorState(message: String, modifier: Modifier = Modifier) {
 @Composable
 private fun PuzzleContent(
     puzzle: LoadedPuzzle,
+    initialSession: PuzzleSession,
+    onSessionPersisted: (PuzzleSession) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    var session by remember(puzzle) { mutableStateOf(PuzzleSession()) }
+    var session by remember(puzzle, initialSession) { mutableStateOf(initialSession) }
     val paletteById = remember(puzzle.palette) { puzzle.palette.associateBy { it.id } }
     val selectedPalette = session.selectedPaletteId?.let { paletteById[it] }
 
@@ -212,9 +243,11 @@ private fun PuzzleContent(
                     val targetPaletteId = hitRegion.region.targetPaletteId ?: return@PuzzleCanvas
 
                     if (targetPaletteId == selectedPaletteId) {
-                        session = session.copy(
+                        val updatedSession = session.copy(
                             fillsByRegionId = session.fillsByRegionId + (hitRegion.region.id to selectedPaletteId),
                         )
+                        session = updatedSession
+                        onSessionPersisted(updatedSession)
                     }
                 },
                 modifier = Modifier
