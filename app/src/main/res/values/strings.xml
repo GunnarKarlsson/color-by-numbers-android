@@ -1,3 +1,7 @@
 <resources>
     <string name="app_name">ColorByNumber</string>
+    <string name="coloring_title">Coloring</string>
+    <string name="coloring_subtitle">Bundled puzzle preview for Step 1</string>
+    <string name="palette_title">Palette</string>
+    <string name="coloring_load_failed">Failed to load the sample puzzle.</string>
 </resources>
