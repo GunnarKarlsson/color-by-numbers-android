@@ -1,0 +1,539 @@
+{
+  "version": 1,
+  "metadata": {
+    "palette": [
+      {
+        "id": 1,
+        "label": "Red",
+        "rgba": [
+          220,
+          64,
+          64,
+          255
+        ]
+      },
+      {
+        "id": 2,
+        "label": "Blue",
+        "rgba": [
+          74,
+          124,
+          232,
+          255
+        ]
+      },
+      {
+        "id": 3,
+        "label": "Green",
+        "rgba": [
+          52,
+          168,
+          83,
+          255
+        ]
+      },
+      {
+        "id": 4,
+        "label": "Yellow",
+        "rgba": [
+          244,
+          180,
+          0,
+          255
+        ]
+      },
+      {
+        "id": 5,
+        "label": "Color 5",
+        "rgba": [
+          96,
+          53,
+          123,
+          255
+        ]
+      },
+      {
+        "id": 6,
+        "label": "Color 6",
+        "rgba": [
+          205,
+          189,
+          219,
+          255
+        ]
+      },
+      {
+        "id": 7,
+        "label": "Color 7",
+        "rgba": [
+          78,
+          67,
+          89,
+          255
+        ]
+      },
+      {
+        "id": 8,
+        "label": "Color 8",
+        "rgba": [
+          211,
+          120,
+          73,
+          255
+        ]
+      },
+      {
+        "id": 9,
+        "label": "Color 9",
+        "rgba": [
+          248,
+          193,
+          124,
+          255
+        ]
+      },
+      {
+        "id": 10,
+        "label": "Color 10",
+        "rgba": [
+          115,
+          172,
+          190,
+          255
+        ]
+      }
+    ],
+    "region_color_map": [
+      {
+        "region_id": 1,
+        "palette_color_id": 5
+      },
+      {
+        "region_id": 2,
+        "palette_color_id": 6
+      },
+      {
+        "region_id": 3,
+        "palette_color_id": 8
+      },
+      {
+        "region_id": 4,
+        "palette_color_id": 7
+      }
+    ],
+    "palette_link": {
+      "palette_id": "palette-18ab0c5d488ed648",
+      "path": "flower.cbnpalette"
+    }
+  },
+  "image_curve_data": {
+    "image_path": null,
+    "bounds": [
+      1200.0,
+      800.0
+    ],
+    "regions": [
+      {
+        "id": 1,
+        "number": 5,
+        "number_position": [
+          -411.23193,
+          -111.989494
+        ],
+        "target_palette_id": 5
+      },
+      {
+        "id": 2,
+        "number": 6,
+        "number_position": [
+          -210.94437,
+          -159.01627
+        ],
+        "target_palette_id": 6
+      },
+      {
+        "id": 3,
+        "number": 8,
+        "number_position": [
+          -237.04976,
+          76.25192
+        ],
+        "target_palette_id": 8
+      },
+      {
+        "id": 4,
+        "number": 7,
+        "number_position": [
+          -103.44202,
+          -76.00328
+        ],
+        "target_palette_id": 7
+      }
+    ],
+    "topology": {
+      "vertices": [
+        {
+          "id": 1,
+          "pos": [
+            -477.3789,
+            -209.83984
+          ]
+        },
+        {
+          "id": 2,
+          "pos": [
+            -536.1406,
+            -72.66797
+          ]
+        },
+        {
+          "id": 3,
+          "pos": [
+            -314.3828,
+            -36.41797
+          ]
+        },
+        {
+          "id": 4,
+          "pos": [
+            -298.91318,
+            -73.15993
+          ]
+        },
+        {
+          "id": 5,
+          "pos": [
+            -280.4961,
+            -116.90234
+          ]
+        },
+        {
+          "id": 6,
+          "pos": [
+            -477.05078,
+            -210.64844
+          ]
+        },
+        {
+          "id": 7,
+          "pos": [
+            -276.41016,
+            -269.95703
+          ]
+        },
+        {
+          "id": 8,
+          "pos": [
+            -122.14453,
+            -252.40625
+          ]
+        },
+        {
+          "id": 9,
+          "pos": [
+            -147.16788,
+            -128.41391
+          ]
+        },
+        {
+          "id": 10,
+          "pos": [
+            -165.51593,
+            -37.498184
+          ]
+        },
+        {
+          "id": 11,
+          "pos": [
+            -166.5664,
+            -32.29297
+          ]
+        },
+        {
+          "id": 12,
+          "pos": [
+            -154.21391,
+            12.408043
+          ]
+        },
+        {
+          "id": 13,
+          "pos": [
+            -110.33203,
+            171.20703
+          ]
+        },
+        {
+          "id": 14,
+          "pos": [
+            -365.23828,
+            118.62109
+          ]
+        },
+        {
+          "id": 15,
+          "pos": [
+            -243.1289,
+            12.0390625
+          ]
+        },
+        {
+          "id": 16,
+          "pos": [
+            -208.42969,
+            39.910156
+          ]
+        },
+        {
+          "id": 17,
+          "pos": [
+            5.1914062,
+            -118.73047
+          ]
+        },
+        {
+          "id": 18,
+          "pos": [
+            -147.29799,
+            -127.76923
+          ]
+        }
+      ],
+      "edges": [
+        {
+          "id": 1,
+          "start": 1,
+          "end": 2
+        },
+        {
+          "id": 2,
+          "start": 2,
+          "end": 3
+        },
+        {
+          "id": 3,
+          "start": 3,
+          "end": 4
+        },
+        {
+          "id": 4,
+          "start": 4,
+          "end": 5
+        },
+        {
+          "id": 5,
+          "start": 5,
+          "end": 6
+        },
+        {
+          "id": 6,
+          "start": 6,
+          "end": 1
+        },
+        {
+          "id": 7,
+          "start": 5,
+          "end": 7
+        },
+        {
+          "id": 8,
+          "start": 7,
+          "end": 8
+        },
+        {
+          "id": 9,
+          "start": 8,
+          "end": 9
+        },
+        {
+          "id": 10,
+          "start": 9,
+          "end": 10
+        },
+        {
+          "id": 11,
+          "start": 10,
+          "end": 11
+        },
+        {
+          "id": 12,
+          "start": 11,
+          "end": 4
+        },
+        {
+          "id": 13,
+          "start": 11,
+          "end": 12
+        },
+        {
+          "id": 14,
+          "start": 12,
+          "end": 13
+        },
+        {
+          "id": 15,
+          "start": 13,
+          "end": 14
+        },
+        {
+          "id": 16,
+          "start": 14,
+          "end": 3
+        },
+        {
+          "id": 17,
+          "start": 3,
+          "end": 15
+        },
+        {
+          "id": 18,
+          "start": 15,
+          "end": 16
+        },
+        {
+          "id": 19,
+          "start": 16,
+          "end": 11
+        },
+        {
+          "id": 20,
+          "start": 9,
+          "end": 17
+        },
+        {
+          "id": 21,
+          "start": 17,
+          "end": 12
+        },
+        {
+          "id": 22,
+          "start": 12,
+          "end": 10
+        },
+        {
+          "id": 23,
+          "start": 10,
+          "end": 18
+        }
+      ],
+      "regions": [
+        {
+          "region_id": 1,
+          "boundary": [
+            {
+              "edge_id": 1,
+              "reversed": false
+            },
+            {
+              "edge_id": 2,
+              "reversed": false
+            },
+            {
+              "edge_id": 3,
+              "reversed": false
+            },
+            {
+              "edge_id": 4,
+              "reversed": false
+            },
+            {
+              "edge_id": 5,
+              "reversed": false
+            },
+            {
+              "edge_id": 6,
+              "reversed": false
+            }
+          ]
+        },
+        {
+          "region_id": 2,
+          "boundary": [
+            {
+              "edge_id": 7,
+              "reversed": false
+            },
+            {
+              "edge_id": 8,
+              "reversed": false
+            },
+            {
+              "edge_id": 9,
+              "reversed": false
+            },
+            {
+              "edge_id": 10,
+              "reversed": false
+            },
+            {
+              "edge_id": 11,
+              "reversed": false
+            },
+            {
+              "edge_id": 12,
+              "reversed": false
+            },
+            {
+              "edge_id": 4,
+              "reversed": false
+            }
+          ]
+        },
+        {
+          "region_id": 3,
+          "boundary": [
+            {
+              "edge_id": 13,
+              "reversed": false
+            },
+            {
+              "edge_id": 14,
+              "reversed": false
+            },
+            {
+              "edge_id": 15,
+              "reversed": false
+            },
+            {
+              "edge_id": 16,
+              "reversed": false
+            },
+            {
+              "edge_id": 17,
+              "reversed": false
+            },
+            {
+              "edge_id": 18,
+              "reversed": false
+            },
+            {
+              "edge_id": 19,
+              "reversed": false
+            }
+          ]
+        },
+        {
+          "region_id": 4,
+          "boundary": [
+            {
+              "edge_id": 20,
+              "reversed": false
+            },
+            {
+              "edge_id": 21,
+              "reversed": false
+            },
+            {
+              "edge_id": 22,
+              "reversed": false
+            },
+            {
+              "edge_id": 23,
+              "reversed": false
+            }
+          ]
+        }
+      ]
+    }
+  }
+}

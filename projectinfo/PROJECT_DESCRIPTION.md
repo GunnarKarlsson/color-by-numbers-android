@@ -27,4 +27,4 @@ Plan Steps:
 
 3. Save progress
 
-4. Create the ImageGridAcitivyt with thumbnails of images with full coloring.
+4. Create the ImageGridActivity with thumbnails of images with full coloring.

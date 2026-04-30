@@ -1,6 +1,8 @@
 package network.bahn.colorbynumber.android
 
+import android.content.Context
 import android.graphics.Paint
+import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -71,23 +73,30 @@ import network.bahn.colorbynumber.android.coloring.PuzzleSession
 import network.bahn.colorbynumber.android.coloring.PuzzleTopology
 import network.bahn.colorbynumber.android.ui.theme.ColorByNumberTheme
 
-private const val SAMPLE_PUZZLE_ASSET = "puzzles/topology_new_3.cbn"
-
 class ColoringActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        val puzzleItem = PuzzleCatalog.findById(intent.getStringExtra(EXTRA_PUZZLE_ID)) ?: PuzzleCatalog.defaultItem
         enableEdgeToEdge()
         setContent {
             ColorByNumberTheme {
-                ColoringRoute()
+                ColoringRoute(puzzleItem = puzzleItem)
             }
         }
+    }
+
+    companion object {
+        private const val EXTRA_PUZZLE_ID = "puzzle_id"
+
+        fun createIntent(context: Context, puzzleItem: PuzzleListItem): Intent =
+            Intent(context, ColoringActivity::class.java).putExtra(EXTRA_PUZZLE_ID, puzzleItem.id)
     }
 }
 
 private sealed interface ColoringUiState {
     data object Loading : ColoringUiState
     data class Success(
+        val puzzleItem: PuzzleListItem,
         val puzzle: LoadedPuzzle,
         val initialSession: PuzzleSession,
     ) : ColoringUiState
@@ -96,17 +105,18 @@ private sealed interface ColoringUiState {
 }
 
 @Composable
-private fun ColoringRoute() {
+private fun ColoringRoute(puzzleItem: PuzzleListItem) {
     val context = LocalContext.current
     val loader = remember(context) { PuzzleAssetLoader(context) }
     val progressStore = remember(context) { PuzzleProgressStore(context.filesDir) }
     val coroutineScope = rememberCoroutineScope()
-    val state by produceState<ColoringUiState>(initialValue = ColoringUiState.Loading, loader, progressStore) {
+    val state by produceState<ColoringUiState>(initialValue = ColoringUiState.Loading, loader, progressStore, puzzleItem) {
         value = try {
             val result = withContext(Dispatchers.IO) {
-                val puzzle = loader.load(SAMPLE_PUZZLE_ASSET)
-                val restoredFills = progressStore.loadProgress(SAMPLE_PUZZLE_ASSET, puzzle.document)
+                val puzzle = loader.load(puzzleItem.puzzleAssetPath)
+                val restoredFills = progressStore.loadProgress(puzzleItem.puzzleAssetPath, puzzle.document)
                 ColoringUiState.Success(
+                    puzzleItem = puzzleItem,
                     puzzle = puzzle,
                     initialSession = PuzzleSession(fillsByRegionId = restoredFills),
                 )
@@ -121,10 +131,10 @@ private fun ColoringRoute() {
 
     ColoringScreen(
         state = state,
-        onSessionPersisted = { session ->
+        onSessionPersisted = { assetPath, session ->
             coroutineScope.launch(Dispatchers.IO) {
                 progressStore.saveProgress(
-                    assetPath = SAMPLE_PUZZLE_ASSET,
+                    assetPath = assetPath,
                     fillsByRegionId = session.fillsByRegionId,
                 )
             }
@@ -136,13 +146,18 @@ private fun ColoringRoute() {
 @OptIn(ExperimentalMaterial3Api::class)
 private fun ColoringScreen(
     state: ColoringUiState,
-    onSessionPersisted: (PuzzleSession) -> Unit,
+    onSessionPersisted: (String, PuzzleSession) -> Unit,
 ) {
     Scaffold(
         topBar = {
             CenterAlignedTopAppBar(
                 title = {
-                    Text(text = stringResource(R.string.coloring_title))
+                    Text(
+                        text = when (state) {
+                            is ColoringUiState.Success -> state.puzzleItem.displayName
+                            else -> stringResource(R.string.coloring_title)
+                        },
+                    )
                 },
             )
         },
@@ -155,6 +170,7 @@ private fun ColoringScreen(
             )
 
             is ColoringUiState.Success -> PuzzleContent(
+                puzzleAssetPath = state.puzzleItem.puzzleAssetPath,
                 puzzle = state.puzzle,
                 initialSession = state.initialSession,
                 onSessionPersisted = onSessionPersisted,
@@ -191,9 +207,10 @@ private fun ErrorState(message: String, modifier: Modifier = Modifier) {
 
 @Composable
 private fun PuzzleContent(
+    puzzleAssetPath: String,
     puzzle: LoadedPuzzle,
     initialSession: PuzzleSession,
-    onSessionPersisted: (PuzzleSession) -> Unit,
+    onSessionPersisted: (String, PuzzleSession) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     var session by remember(puzzle, initialSession) { mutableStateOf(initialSession) }
@@ -236,7 +253,7 @@ private fun PuzzleContent(
                 onClick = {
                     val clearedSession = PuzzleSession()
                     session = clearedSession
-                    onSessionPersisted(clearedSession)
+                    onSessionPersisted(puzzleAssetPath, clearedSession)
                 },
             ) {
                 Text(text = stringResource(R.string.coloring_clear_progress))
@@ -263,7 +280,7 @@ private fun PuzzleContent(
                             fillsByRegionId = session.fillsByRegionId + (hitRegion.region.id to selectedPaletteId),
                         )
                         session = updatedSession
-                        onSessionPersisted(updatedSession)
+                        onSessionPersisted(puzzleAssetPath, updatedSession)
                     }
                 },
                 modifier = Modifier
