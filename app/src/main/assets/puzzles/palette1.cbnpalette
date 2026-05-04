@@ -1,0 +1,57 @@
+{
+  "version": 1,
+  "palette_id": "palette-18ac3afb241d4e70",
+  "name": "Default Palette",
+  "colors": [
+    {
+      "id": 1,
+      "label": "Red",
+      "rgba": [
+        220,
+        64,
+        64,
+        255
+      ]
+    },
+    {
+      "id": 2,
+      "label": "Blue",
+      "rgba": [
+        74,
+        124,
+        232,
+        255
+      ]
+    },
+    {
+      "id": 3,
+      "label": "Green",
+      "rgba": [
+        52,
+        168,
+        83,
+        255
+      ]
+    },
+    {
+      "id": 4,
+      "label": "Yellow",
+      "rgba": [
+        244,
+        180,
+        0,
+        255
+      ]
+    },
+    {
+      "id": 5,
+      "label": "Color 5",
+      "rgba": [
+        147,
+        108,
+        193,
+        255
+      ]
+    }
+  ]
+}

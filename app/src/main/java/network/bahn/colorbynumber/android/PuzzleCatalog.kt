@@ -10,6 +10,12 @@ data class PuzzleListItem(
 object PuzzleCatalog {
     val items: List<PuzzleListItem> = listOf(
         PuzzleListItem(
+            id = "image1",
+            displayName = "Image 1",
+            puzzleAssetPath = "puzzles/image1.cbn",
+            previewAssetPath = "previews/image1_preview.png",
+        ),
+        PuzzleListItem(
             id = "topology_new_3",
             displayName = "Topology New 3",
             puzzleAssetPath = "puzzles/topology_new_3.cbn",
