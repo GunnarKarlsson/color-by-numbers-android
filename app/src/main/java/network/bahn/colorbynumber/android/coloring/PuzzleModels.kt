@@ -136,6 +136,7 @@ data class LoadedPuzzle(
 data class PuzzleSession(
     val selectedPaletteId: Int? = null,
     val fillsByRegionId: Map<Int, Int> = emptyMap(),
+    val fillHistory: List<Int> = emptyList(),
 ) {
     val filledCount: Int
         get() = fillsByRegionId.size

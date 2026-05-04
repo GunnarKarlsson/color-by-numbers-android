@@ -14,11 +14,13 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -27,22 +29,21 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -53,6 +54,7 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.PathFillType
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
@@ -68,6 +70,8 @@ import androidx.compose.ui.layout.onSizeChanged
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlin.math.cos
+import kotlin.math.sin
 import network.bahn.colorbynumber.android.coloring.LoadedPuzzle
 import network.bahn.colorbynumber.android.coloring.OutlineSegment
 import network.bahn.colorbynumber.android.coloring.PaletteColor
@@ -131,7 +135,10 @@ private fun ColoringRoute(
                 ColoringUiState.Success(
                     puzzleItem = puzzleItem,
                     puzzle = puzzle,
-                    initialSession = PuzzleSession(fillsByRegionId = restoredFills),
+                    initialSession = PuzzleSession(
+                        fillsByRegionId = restoredFills,
+                        fillHistory = restoredFills.keys.toList(),
+                    ),
                 )
             }
             result
@@ -164,44 +171,124 @@ private fun ColoringScreen(
     onNavigateBack: () -> Unit,
     onSessionPersisted: (String, Int, PuzzleSession) -> Unit,
 ) {
-    Scaffold(
-        topBar = {
-            CenterAlignedTopAppBar(
-                navigationIcon = {
-                    IconButton(onClick = onNavigateBack) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = stringResource(R.string.coloring_back),
-                        )
-                    }
-                },
-                title = {
-                    Text(
-                        text = when (state) {
-                            is ColoringUiState.Success -> state.puzzleItem.displayName
-                            else -> stringResource(R.string.coloring_title)
-                        },
-                    )
-                },
-            )
-        },
-    ) { innerPadding ->
-        when (state) {
-            ColoringUiState.Loading -> LoadingState(modifier = Modifier.padding(innerPadding))
-            is ColoringUiState.Error -> ErrorState(
+    when (state) {
+        ColoringUiState.Loading -> Scaffold(
+            topBar = {
+                ColoringTopBar(
+                    title = stringResource(R.string.coloring_title),
+                    onNavigateBack = onNavigateBack,
+                )
+            },
+        ) { innerPadding ->
+            LoadingState(modifier = Modifier.padding(innerPadding))
+        }
+
+        is ColoringUiState.Error -> Scaffold(
+            topBar = {
+                ColoringTopBar(
+                    title = stringResource(R.string.coloring_title),
+                    onNavigateBack = onNavigateBack,
+                )
+            },
+        ) { innerPadding ->
+            ErrorState(
                 message = state.message,
                 modifier = Modifier.padding(innerPadding),
             )
+        }
 
-            is ColoringUiState.Success -> PuzzleContent(
-                puzzleAssetPath = state.puzzleItem.puzzleAssetPath,
-                puzzle = state.puzzle,
-                initialSession = state.initialSession,
-                onSessionPersisted = onSessionPersisted,
-                modifier = Modifier.padding(innerPadding),
-            )
+        is ColoringUiState.Success -> {
+            var session by remember(state.puzzleItem.id, state.initialSession) {
+                mutableStateOf(state.initialSession)
+            }
+            val totalRegions = state.puzzle.document.regions.size
+            val persistSession = remember(state.puzzleItem.puzzleAssetPath, totalRegions, onSessionPersisted) {
+                { updatedSession: PuzzleSession ->
+                    onSessionPersisted(
+                        state.puzzleItem.puzzleAssetPath,
+                        totalRegions,
+                        updatedSession,
+                    )
+                }
+            }
+
+            Scaffold(
+                topBar = {
+                    ColoringTopBar(
+                        title = state.puzzleItem.displayName,
+                        onNavigateBack = onNavigateBack,
+                        clearEnabled = session.fillHistory.isNotEmpty(),
+                        clearAllEnabled = session.fillsByRegionId.isNotEmpty(),
+                        onClear = {
+                            val updatedSession = session.undoLastFill()
+                            session = updatedSession
+                            persistSession(updatedSession)
+                        },
+                        onClearAll = {
+                            val clearedSession = PuzzleSession(selectedPaletteId = session.selectedPaletteId)
+                            session = clearedSession
+                            persistSession(clearedSession)
+                        },
+                    )
+                },
+            ) { innerPadding ->
+                PuzzleContent(
+                    puzzle = state.puzzle,
+                    session = session,
+                    onSessionChanged = { session = it },
+                    onSessionPersisted = persistSession,
+                    modifier = Modifier.padding(innerPadding),
+                )
+            }
         }
     }
+}
+
+@Composable
+@OptIn(ExperimentalMaterial3Api::class)
+private fun ColoringTopBar(
+    title: String,
+    onNavigateBack: () -> Unit,
+    clearEnabled: Boolean = false,
+    clearAllEnabled: Boolean = false,
+    onClear: (() -> Unit)? = null,
+    onClearAll: (() -> Unit)? = null,
+) {
+    TopAppBar(
+        navigationIcon = {
+            IconButton(onClick = onNavigateBack) {
+                androidx.compose.material3.Icon(
+                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                    contentDescription = stringResource(R.string.coloring_back),
+                )
+            }
+        },
+        title = { Text(text = title) },
+        actions = {
+            if (onClear != null) {
+                IconButton(
+                    enabled = clearEnabled,
+                    onClick = onClear,
+                ) {
+                    UndoLastActionIcon(
+                        enabled = clearEnabled,
+                        contentDescription = stringResource(R.string.coloring_clear_last),
+                    )
+                }
+            }
+            if (onClearAll != null) {
+                IconButton(
+                    enabled = clearAllEnabled,
+                    onClick = onClearAll,
+                ) {
+                    ClearAllIcon(
+                        enabled = clearAllEnabled,
+                        contentDescription = stringResource(R.string.coloring_clear_all),
+                    )
+                }
+            }
+        },
+    )
 }
 
 @Composable
@@ -231,16 +318,17 @@ private fun ErrorState(message: String, modifier: Modifier = Modifier) {
 
 @Composable
 private fun PuzzleContent(
-    puzzleAssetPath: String,
     puzzle: LoadedPuzzle,
-    initialSession: PuzzleSession,
-    onSessionPersisted: (String, Int, PuzzleSession) -> Unit,
+    session: PuzzleSession,
+    onSessionChanged: (PuzzleSession) -> Unit,
+    onSessionPersisted: (PuzzleSession) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    var session by remember(puzzle, initialSession) { mutableStateOf(initialSession) }
     val paletteById = remember(puzzle.palette) { puzzle.palette.associateBy { it.id } }
-    val selectedPalette = session.selectedPaletteId?.let { paletteById[it] }
     val totalRegions = puzzle.document.regions.size
+    val puzzleAspectRatio = remember(puzzle.worldBounds) {
+        (puzzle.worldBounds.width / puzzle.worldBounds.height).takeIf { it > 0f } ?: 1f
+    }
 
     Column(
         modifier = modifier
@@ -248,48 +336,15 @@ private fun PuzzleContent(
             .padding(horizontal = 16.dp, vertical = 12.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        Text(
-            text = stringResource(R.string.coloring_subtitle),
-            style = MaterialTheme.typography.bodyMedium,
+        ProgressBadge(
+            filledCount = session.filledCount,
+            totalRegions = totalRegions,
         )
-        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Text(
-                text = stringResource(
-                    R.string.coloring_progress,
-                    session.filledCount,
-                    totalRegions,
-                ),
-                style = MaterialTheme.typography.bodyMedium,
-                fontWeight = FontWeight.SemiBold,
-            )
-            Text(
-                text = selectedPalette?.let {
-                    stringResource(R.string.coloring_selected_palette, it.id, it.label)
-                } ?: stringResource(R.string.coloring_no_palette_selected),
-                style = MaterialTheme.typography.bodyMedium,
-            )
-        }
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.End,
-        ) {
-            OutlinedButton(
-                enabled = session.fillsByRegionId.isNotEmpty(),
-                onClick = {
-                    val clearedSession = PuzzleSession()
-                    session = clearedSession
-                    onSessionPersisted(puzzleAssetPath, totalRegions, clearedSession)
-                },
-            ) {
-                Text(text = stringResource(R.string.coloring_clear_progress))
-            }
-        }
-        Surface(
+        Box(
             modifier = Modifier
                 .fillMaxWidth()
                 .weight(1f),
-            tonalElevation = 2.dp,
-            shadowElevation = 1.dp,
+            contentAlignment = Alignment.Center,
         ) {
             PuzzleCanvas(
                 puzzle = puzzle,
@@ -298,27 +353,58 @@ private fun PuzzleContent(
                 onPuzzleTapped = { worldPoint ->
                     val selectedPaletteId = session.selectedPaletteId ?: return@PuzzleCanvas
                     val hitRegion = PuzzleTopology.hitTestRegion(puzzle.renderRegions, worldPoint) ?: return@PuzzleCanvas
+                    if (session.fillsByRegionId.containsKey(hitRegion.region.id)) return@PuzzleCanvas
                     val targetPaletteId = hitRegion.region.targetPaletteId ?: return@PuzzleCanvas
 
                     if (targetPaletteId == selectedPaletteId) {
                         val updatedSession = session.copy(
                             fillsByRegionId = session.fillsByRegionId + (hitRegion.region.id to selectedPaletteId),
+                            fillHistory = session.fillHistory + hitRegion.region.id,
                         )
-                        session = updatedSession
-                        onSessionPersisted(puzzleAssetPath, totalRegions, updatedSession)
+                        onSessionChanged(updatedSession)
+                        onSessionPersisted(updatedSession)
                     }
                 },
                 modifier = Modifier
-                    .fillMaxSize()
-                    .padding(12.dp),
+                    .fillMaxWidth()
+                    .aspectRatio(puzzleAspectRatio),
             )
         }
         PaletteStrip(
             colors = puzzle.palette,
             selectedPaletteId = session.selectedPaletteId,
             onPaletteSelected = { paletteId ->
-                session = session.copy(selectedPaletteId = paletteId)
+                onSessionChanged(session.copy(selectedPaletteId = paletteId))
             },
+        )
+    }
+}
+
+@Composable
+private fun ProgressBadge(
+    filledCount: Int,
+    totalRegions: Int,
+    modifier: Modifier = Modifier,
+) {
+    Box(
+        modifier = modifier
+            .size(72.dp)
+            .clip(CircleShape)
+            .border(
+                width = 2.dp,
+                color = MaterialTheme.colorScheme.primary,
+                shape = CircleShape,
+            )
+            .background(
+                color = MaterialTheme.colorScheme.surfaceVariant,
+                shape = CircleShape,
+            ),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(
+            text = "$filledCount/$totalRegions",
+            style = MaterialTheme.typography.labelLarge,
+            fontWeight = FontWeight.SemiBold,
         )
     }
 }
@@ -332,8 +418,9 @@ private fun PuzzleCanvas(
     modifier: Modifier = Modifier,
 ) {
     val density = LocalDensity.current
-    val numberTextSize = 18.sp
-    val canvasPaddingPx = with(density) { 24.dp.toPx() }
+    val numberTextSize = 14.sp
+    val canvasPaddingPx = with(density) { 2.dp.toPx() }
+    val currentOnPuzzleTapped by rememberUpdatedState(onPuzzleTapped)
     var canvasSize by remember { mutableStateOf(IntSize.Zero) }
     var viewport by remember(puzzle) { mutableStateOf(PuzzleViewport()) }
     val baseTransform = remember(canvasSize, puzzle.worldBounds, canvasPaddingPx) {
@@ -388,7 +475,7 @@ private fun PuzzleCanvas(
             .pointerInput(transform, puzzle.renderRegions) {
                 detectTapGestures { offset ->
                     val currentTransform = transform ?: return@detectTapGestures
-                    onPuzzleTapped(currentTransform.toWorld(offset))
+                    currentOnPuzzleTapped(currentTransform.toWorld(offset))
                 }
             },
     ) {
@@ -473,12 +560,7 @@ private fun PaletteStrip(
     selectedPaletteId: Int?,
     onPaletteSelected: (Int) -> Unit,
 ) {
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text(
-            text = stringResource(R.string.palette_title),
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.SemiBold,
-        )
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -497,7 +579,7 @@ private fun PaletteStrip(
                             .clickable { onPaletteSelected(paletteColor.id) }
                             .size(40.dp)
                             .border(
-                                width = if (isSelected) 3.dp else 1.dp,
+                                width = if (isSelected) 5.dp else 1.dp,
                                 color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline,
                                 shape = MaterialTheme.shapes.small,
                             )
@@ -516,6 +598,148 @@ private fun PaletteStrip(
         }
         Spacer(modifier = Modifier.height(4.dp))
     }
+}
+
+@Composable
+private fun UndoLastActionIcon(
+    enabled: Boolean,
+    contentDescription: String,
+    modifier: Modifier = Modifier,
+) {
+    val tint = LocalContentColor.current.copy(alpha = if (enabled) 1f else 0.38f)
+    Canvas(
+        modifier = modifier.size(24.dp),
+        onDraw = {
+            val strokeWidth = size.minDimension * 0.14f
+            val inset = strokeWidth * 1.2f
+            val arcSize = Size(
+                width = size.width - (inset * 2f),
+                height = size.height - (inset * 2f),
+            )
+
+            drawArc(
+                color = tint,
+                startAngle = 160f,
+                sweepAngle = 250f,
+                useCenter = false,
+                topLeft = Offset(inset, inset),
+                size = arcSize,
+                style = Stroke(width = strokeWidth, cap = StrokeCap.Round),
+            )
+
+            val center = Offset(x = size.width / 2f, y = size.height / 2f)
+            val radius = arcSize.minDimension / 2f
+            val arrowTip = polarToOffset(center = center, radius = radius, angleDegrees = 160f)
+            drawLine(
+                color = tint,
+                start = arrowTip,
+                end = Offset(arrowTip.x + (strokeWidth * 1.4f), arrowTip.y - (strokeWidth * 1.2f)),
+                strokeWidth = strokeWidth,
+                cap = StrokeCap.Round,
+            )
+            drawLine(
+                color = tint,
+                start = arrowTip,
+                end = Offset(arrowTip.x + (strokeWidth * 1.4f), arrowTip.y + (strokeWidth * 1.2f)),
+                strokeWidth = strokeWidth,
+                cap = StrokeCap.Round,
+            )
+        },
+    )
+}
+
+@Composable
+private fun ClearAllIcon(
+    enabled: Boolean,
+    contentDescription: String,
+    modifier: Modifier = Modifier,
+) {
+    val tint = LocalContentColor.current.copy(alpha = if (enabled) 1f else 0.38f)
+    Canvas(modifier = modifier.size(24.dp)) {
+        val strokeWidth = size.minDimension * 0.12f
+        val inset = strokeWidth
+        val arcSize = Size(
+            width = size.width - (inset * 2f),
+            height = size.height - (inset * 2f),
+        )
+
+        drawArc(
+            color = tint,
+            startAngle = 145f,
+            sweepAngle = 285f,
+            useCenter = false,
+            topLeft = Offset(inset, inset),
+            size = arcSize,
+            style = Stroke(width = strokeWidth, cap = StrokeCap.Round),
+        )
+
+        val center = Offset(x = size.width / 2f, y = size.height / 2f)
+        val radius = (arcSize.minDimension / 2f)
+        val arrowTip = polarToOffset(
+            center = center,
+            radius = radius,
+            angleDegrees = 145f,
+        )
+        val arrowWingA = Offset(
+            x = arrowTip.x - (strokeWidth * 1.3f),
+            y = arrowTip.y + (strokeWidth * 0.2f),
+        )
+        val arrowWingB = Offset(
+            x = arrowTip.x - (strokeWidth * 0.2f),
+            y = arrowTip.y + (strokeWidth * 1.3f),
+        )
+
+        drawLine(
+            color = tint,
+            start = arrowTip,
+            end = arrowWingA,
+            strokeWidth = strokeWidth,
+            cap = StrokeCap.Round,
+        )
+        drawLine(
+            color = tint,
+            start = arrowTip,
+            end = arrowWingB,
+            strokeWidth = strokeWidth,
+            cap = StrokeCap.Round,
+        )
+
+        val xInset = size.minDimension * 0.34f
+        drawLine(
+            color = tint,
+            start = Offset(xInset, xInset),
+            end = Offset(size.width - xInset, size.height - xInset),
+            strokeWidth = strokeWidth,
+            cap = StrokeCap.Round,
+        )
+        drawLine(
+            color = tint,
+            start = Offset(size.width - xInset, xInset),
+            end = Offset(xInset, size.height - xInset),
+            strokeWidth = strokeWidth,
+            cap = StrokeCap.Round,
+        )
+    }
+}
+
+private fun PuzzleSession.undoLastFill(): PuzzleSession {
+    val regionId = fillHistory.lastOrNull() ?: return this
+    return copy(
+        fillsByRegionId = fillsByRegionId - regionId,
+        fillHistory = fillHistory.dropLast(1),
+    )
+}
+
+private fun polarToOffset(
+    center: Offset,
+    radius: Float,
+    angleDegrees: Float,
+): Offset {
+    val radians = Math.toRadians(angleDegrees.toDouble())
+    return Offset(
+        x = center.x + (radius * cos(radians)).toFloat(),
+        y = center.y + (radius * sin(radians)).toFloat(),
+    )
 }
 
 private data class ScreenTransform(
