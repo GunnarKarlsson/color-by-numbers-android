@@ -1,0 +1,87 @@
+{
+  "version": 1,
+  "palette_id": "palette-18ac3fdcf25a1c10",
+  "name": "Default Palette",
+  "colors": [
+    {
+      "id": 1,
+      "label": "Red",
+      "rgba": [
+        220,
+        64,
+        64,
+        255
+      ]
+    },
+    {
+      "id": 2,
+      "label": "Blue",
+      "rgba": [
+        74,
+        124,
+        232,
+        255
+      ]
+    },
+    {
+      "id": 3,
+      "label": "Green",
+      "rgba": [
+        52,
+        168,
+        83,
+        255
+      ]
+    },
+    {
+      "id": 4,
+      "label": "Yellow",
+      "rgba": [
+        244,
+        180,
+        0,
+        255
+      ]
+    },
+    {
+      "id": 5,
+      "label": "Color 5",
+      "rgba": [
+        206,
+        99,
+        222,
+        255
+      ]
+    },
+    {
+      "id": 6,
+      "label": "Color 6",
+      "rgba": [
+        219,
+        185,
+        226,
+        255
+      ]
+    },
+    {
+      "id": 7,
+      "label": "Color 7",
+      "rgba": [
+        71,
+        172,
+        214,
+        255
+      ]
+    },
+    {
+      "id": 8,
+      "label": "Color 8",
+      "rgba": [
+        121,
+        147,
+        162,
+        255
+      ]
+    }
+  ]
+}

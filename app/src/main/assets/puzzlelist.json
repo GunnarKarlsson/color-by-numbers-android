@@ -16,5 +16,17 @@
     "displayName": "Image 3",
     "puzzleAssetPath": "puzzles/image3.cbn",
     "previewAssetPath": "previews/image3_preview.png"
+  },
+  {
+    "id": "image4",
+    "displayName": "Image 4",
+    "puzzleAssetPath": "puzzles/image4.cbn",
+    "previewAssetPath": "previews/image4_preview.png"
+  },
+  {
+    "id": "image5",
+    "displayName": "Image 5",
+    "puzzleAssetPath": "puzzles/image5.cbn",
+    "previewAssetPath": "previews/image5_preview.png"
   }
 ]
