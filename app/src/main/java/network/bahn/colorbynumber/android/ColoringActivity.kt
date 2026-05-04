@@ -56,6 +56,7 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.PathFillType
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.graphics.drawscope.clipPath
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
@@ -497,14 +498,23 @@ private fun PuzzleCanvas(
         val currentTransform = transform ?: return@Canvas
 
         puzzle.renderRegions.forEach { renderRegion ->
-            val fillColor = session.fillsByRegionId[renderRegion.region.id]
-                ?.let { paletteById[it]?.composeColor }
-                ?: Color(0xFFF7F7F7)
             val path = shapePath(renderRegion.shape, currentTransform)
-            drawPath(
-                path = path,
-                color = fillColor,
-            )
+            val appliedFill = session.fillsByRegionId[renderRegion.region.id]
+            val showSelectedPreview = appliedFill == null &&
+                renderRegion.region.targetPaletteId != null &&
+                renderRegion.region.targetPaletteId == session.selectedPaletteId
+
+            if (showSelectedPreview) {
+                drawCheckerboardPreview(path)
+            } else {
+                val fillColor = appliedFill
+                    ?.let { paletteById[it]?.composeColor }
+                    ?: Color(0xFFF7F7F7)
+                drawPath(
+                    path = path,
+                    color = fillColor,
+                )
+            }
         }
 
         puzzle.renderRegions.forEach { renderRegion ->
@@ -541,6 +551,36 @@ private fun DrawScope.drawOutline(segment: OutlineSegment, transform: ScreenTran
         strokeWidth = 2.dp.toPx(),
         cap = StrokeCap.Round,
     )
+}
+
+private fun DrawScope.drawCheckerboardPreview(path: Path) {
+    drawPath(
+        path = path,
+        color = Color.White,
+    )
+    val bounds = path.getBounds()
+    clipPath(path) {
+        val startColumn = (bounds.left / CHECKER_TILE_SIZE_PX).toInt() - 1
+        val endColumn = (bounds.right / CHECKER_TILE_SIZE_PX).toInt() + 1
+        val startRow = (bounds.top / CHECKER_TILE_SIZE_PX).toInt() - 1
+        val endRow = (bounds.bottom / CHECKER_TILE_SIZE_PX).toInt() + 1
+
+        for (row in startRow..endRow) {
+            for (column in startColumn..endColumn) {
+                if ((row + column) % 2 == 0) {
+                    continue
+                }
+                drawRect(
+                    color = CHECKER_DARK_COLOR,
+                    topLeft = Offset(
+                        x = column * CHECKER_TILE_SIZE_PX,
+                        y = row * CHECKER_TILE_SIZE_PX,
+                    ),
+                    size = Size(CHECKER_TILE_SIZE_PX, CHECKER_TILE_SIZE_PX),
+                )
+            }
+        }
+    }
 }
 
 private fun shapePath(shape: RenderShape, transform: ScreenTransform): Path {
@@ -672,3 +712,5 @@ private data class PuzzleViewport(
 
 private const val MIN_ZOOM = 1f
 private const val MAX_ZOOM = 6f
+private const val CHECKER_TILE_SIZE_PX = 16f
+private val CHECKER_DARK_COLOR = Color(0xFFD2D2D2)
