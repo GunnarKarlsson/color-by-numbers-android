@@ -332,8 +332,8 @@ private fun PuzzleContent(
     Column(
         modifier = modifier
             .fillMaxSize()
-            .padding(horizontal = 16.dp, vertical = 12.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
+            .padding(horizontal = 16.dp, vertical = 8.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         ProgressBadge(
             filledCount = session.filledCount,
@@ -376,6 +376,20 @@ private fun PuzzleContent(
                 onSessionChanged(session.copy(selectedPaletteId = paletteId))
             },
         )
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(56.dp)
+                .border(
+                    width = 1.dp,
+                    color = MaterialTheme.colorScheme.outlineVariant,
+                    shape = MaterialTheme.shapes.small,
+                )
+                .background(
+                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
+                    shape = MaterialTheme.shapes.small,
+                ),
+        )
     }
 }
 
@@ -387,10 +401,10 @@ private fun ProgressBadge(
 ) {
     Box(
         modifier = modifier
-            .size(72.dp)
+            .size(56.dp)
             .clip(CircleShape)
             .border(
-                width = 2.dp,
+                width = 1.5.dp,
                 color = MaterialTheme.colorScheme.primary,
                 shape = CircleShape,
             )
@@ -402,7 +416,7 @@ private fun ProgressBadge(
     ) {
         Text(
             text = "$filledCount/$totalRegions",
-            style = MaterialTheme.typography.labelLarge,
+            style = MaterialTheme.typography.labelMedium,
             fontWeight = FontWeight.SemiBold,
         )
     }
