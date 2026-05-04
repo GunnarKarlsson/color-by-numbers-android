@@ -1,5 +1,9 @@
 package network.bahn.colorbynumber.android
 
+import android.content.Context
+import com.google.gson.Gson
+import com.google.gson.GsonBuilder
+
 data class PuzzleListItem(
     val id: String,
     val displayName: String,
@@ -8,36 +12,40 @@ data class PuzzleListItem(
 )
 
 object PuzzleCatalog {
-    val items: List<PuzzleListItem> = listOf(
-        PuzzleListItem(
-            id = "image1",
-            displayName = "Image 1",
-            puzzleAssetPath = "puzzles/image1.cbn",
-            previewAssetPath = "previews/image1_preview.png",
-        ),
-        PuzzleListItem(
-            id = "image2",
-            displayName = "Image 2",
-            puzzleAssetPath = "puzzles/image2.cbn",
-            previewAssetPath = "previews/image2_preview.png",
-        ),
-        PuzzleListItem(
-            id = "topology_new_3",
-            displayName = "Topology New 3",
-            puzzleAssetPath = "puzzles/topology_new_3.cbn",
-            previewAssetPath = "previews/topology_new_3_preview.png",
-        ),
-        PuzzleListItem(
-            id = "flower",
-            displayName = "Flower",
-            puzzleAssetPath = "puzzles/flower.cbn",
-            previewAssetPath = "previews/flower_preview.png",
-        ),
-    )
+    private val gson: Gson = GsonBuilder().create()
+
+    @Volatile
+    private var cachedItems: List<PuzzleListItem>? = null
+
+    fun initialize(context: Context) {
+        if (cachedItems != null) {
+            return
+        }
+
+        synchronized(this) {
+            if (cachedItems == null) {
+                cachedItems = loadItems(context.applicationContext)
+            }
+        }
+    }
+
+    val items: List<PuzzleListItem>
+        get() = requireNotNull(cachedItems) {
+            "PuzzleCatalog has not been initialized. Call PuzzleCatalog.initialize(context) during app startup."
+        }
 
     fun findById(id: String?): PuzzleListItem? =
         items.firstOrNull { it.id == id }
 
     val defaultItem: PuzzleListItem
         get() = items.first()
+
+    private fun loadItems(context: Context): List<PuzzleListItem> {
+        val json = context.assets.open(PUZZLE_LIST_ASSET_PATH).bufferedReader().use { it.readText() }
+        val loadedItems = gson.fromJson(json, Array<PuzzleListItem>::class.java)?.toList().orEmpty()
+        require(loadedItems.isNotEmpty()) { "Puzzle list asset is empty." }
+        return loadedItems
+    }
+
+    private const val PUZZLE_LIST_ASSET_PATH = "puzzlelist.json"
 }

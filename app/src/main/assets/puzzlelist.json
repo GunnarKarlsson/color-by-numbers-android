@@ -1,0 +1,26 @@
+[
+  {
+    "id": "image1",
+    "displayName": "Image 1",
+    "puzzleAssetPath": "puzzles/image1.cbn",
+    "previewAssetPath": "previews/image1_preview.png"
+  },
+  {
+    "id": "image2",
+    "displayName": "Image 2",
+    "puzzleAssetPath": "puzzles/image2.cbn",
+    "previewAssetPath": "previews/image2_preview.png"
+  },
+  {
+    "id": "topology_new_3",
+    "displayName": "Topology New 3",
+    "puzzleAssetPath": "puzzles/topology_new_3.cbn",
+    "previewAssetPath": "previews/topology_new_3_preview.png"
+  },
+  {
+    "id": "flower",
+    "displayName": "Flower",
+    "puzzleAssetPath": "puzzles/flower.cbn",
+    "previewAssetPath": "previews/flower_preview.png"
+  }
+]
