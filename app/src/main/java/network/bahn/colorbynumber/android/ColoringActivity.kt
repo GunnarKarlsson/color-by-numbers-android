@@ -29,10 +29,12 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.FastRewind
+import androidx.compose.material.icons.filled.SkipPrevious
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -54,7 +56,6 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.PathFillType
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.DrawScope
-import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
@@ -70,8 +71,6 @@ import androidx.compose.ui.layout.onSizeChanged
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import kotlin.math.cos
-import kotlin.math.sin
 import network.bahn.colorbynumber.android.coloring.LoadedPuzzle
 import network.bahn.colorbynumber.android.coloring.OutlineSegment
 import network.bahn.colorbynumber.android.coloring.PaletteColor
@@ -257,7 +256,7 @@ private fun ColoringTopBar(
     TopAppBar(
         navigationIcon = {
             IconButton(onClick = onNavigateBack) {
-                androidx.compose.material3.Icon(
+                        Icon(
                     imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                     contentDescription = stringResource(R.string.coloring_back),
                 )
@@ -270,8 +269,8 @@ private fun ColoringTopBar(
                     enabled = clearEnabled,
                     onClick = onClear,
                 ) {
-                    UndoLastActionIcon(
-                        enabled = clearEnabled,
+                    Icon(
+                        imageVector = Icons.Filled.FastRewind,
                         contentDescription = stringResource(R.string.coloring_clear_last),
                     )
                 }
@@ -281,8 +280,8 @@ private fun ColoringTopBar(
                     enabled = clearAllEnabled,
                     onClick = onClearAll,
                 ) {
-                    ClearAllIcon(
-                        enabled = clearAllEnabled,
+                    Icon(
+                        imageVector = Icons.Filled.SkipPrevious,
                         contentDescription = stringResource(R.string.coloring_clear_all),
                     )
                 }
@@ -600,145 +599,11 @@ private fun PaletteStrip(
     }
 }
 
-@Composable
-private fun UndoLastActionIcon(
-    enabled: Boolean,
-    contentDescription: String,
-    modifier: Modifier = Modifier,
-) {
-    val tint = LocalContentColor.current.copy(alpha = if (enabled) 1f else 0.38f)
-    Canvas(
-        modifier = modifier.size(24.dp),
-        onDraw = {
-            val strokeWidth = size.minDimension * 0.14f
-            val inset = strokeWidth * 1.2f
-            val arcSize = Size(
-                width = size.width - (inset * 2f),
-                height = size.height - (inset * 2f),
-            )
-
-            drawArc(
-                color = tint,
-                startAngle = 160f,
-                sweepAngle = 250f,
-                useCenter = false,
-                topLeft = Offset(inset, inset),
-                size = arcSize,
-                style = Stroke(width = strokeWidth, cap = StrokeCap.Round),
-            )
-
-            val center = Offset(x = size.width / 2f, y = size.height / 2f)
-            val radius = arcSize.minDimension / 2f
-            val arrowTip = polarToOffset(center = center, radius = radius, angleDegrees = 160f)
-            drawLine(
-                color = tint,
-                start = arrowTip,
-                end = Offset(arrowTip.x + (strokeWidth * 1.4f), arrowTip.y - (strokeWidth * 1.2f)),
-                strokeWidth = strokeWidth,
-                cap = StrokeCap.Round,
-            )
-            drawLine(
-                color = tint,
-                start = arrowTip,
-                end = Offset(arrowTip.x + (strokeWidth * 1.4f), arrowTip.y + (strokeWidth * 1.2f)),
-                strokeWidth = strokeWidth,
-                cap = StrokeCap.Round,
-            )
-        },
-    )
-}
-
-@Composable
-private fun ClearAllIcon(
-    enabled: Boolean,
-    contentDescription: String,
-    modifier: Modifier = Modifier,
-) {
-    val tint = LocalContentColor.current.copy(alpha = if (enabled) 1f else 0.38f)
-    Canvas(modifier = modifier.size(24.dp)) {
-        val strokeWidth = size.minDimension * 0.12f
-        val inset = strokeWidth
-        val arcSize = Size(
-            width = size.width - (inset * 2f),
-            height = size.height - (inset * 2f),
-        )
-
-        drawArc(
-            color = tint,
-            startAngle = 145f,
-            sweepAngle = 285f,
-            useCenter = false,
-            topLeft = Offset(inset, inset),
-            size = arcSize,
-            style = Stroke(width = strokeWidth, cap = StrokeCap.Round),
-        )
-
-        val center = Offset(x = size.width / 2f, y = size.height / 2f)
-        val radius = (arcSize.minDimension / 2f)
-        val arrowTip = polarToOffset(
-            center = center,
-            radius = radius,
-            angleDegrees = 145f,
-        )
-        val arrowWingA = Offset(
-            x = arrowTip.x - (strokeWidth * 1.3f),
-            y = arrowTip.y + (strokeWidth * 0.2f),
-        )
-        val arrowWingB = Offset(
-            x = arrowTip.x - (strokeWidth * 0.2f),
-            y = arrowTip.y + (strokeWidth * 1.3f),
-        )
-
-        drawLine(
-            color = tint,
-            start = arrowTip,
-            end = arrowWingA,
-            strokeWidth = strokeWidth,
-            cap = StrokeCap.Round,
-        )
-        drawLine(
-            color = tint,
-            start = arrowTip,
-            end = arrowWingB,
-            strokeWidth = strokeWidth,
-            cap = StrokeCap.Round,
-        )
-
-        val xInset = size.minDimension * 0.34f
-        drawLine(
-            color = tint,
-            start = Offset(xInset, xInset),
-            end = Offset(size.width - xInset, size.height - xInset),
-            strokeWidth = strokeWidth,
-            cap = StrokeCap.Round,
-        )
-        drawLine(
-            color = tint,
-            start = Offset(size.width - xInset, xInset),
-            end = Offset(xInset, size.height - xInset),
-            strokeWidth = strokeWidth,
-            cap = StrokeCap.Round,
-        )
-    }
-}
-
 private fun PuzzleSession.undoLastFill(): PuzzleSession {
     val regionId = fillHistory.lastOrNull() ?: return this
     return copy(
         fillsByRegionId = fillsByRegionId - regionId,
         fillHistory = fillHistory.dropLast(1),
-    )
-}
-
-private fun polarToOffset(
-    center: Offset,
-    radius: Float,
-    angleDegrees: Float,
-): Offset {
-    val radians = Math.toRadians(angleDegrees.toDouble())
-    return Offset(
-        x = center.x + (radius * cos(radians)).toFloat(),
-        y = center.y + (radius * sin(radians)).toFloat(),
     )
 }
 
