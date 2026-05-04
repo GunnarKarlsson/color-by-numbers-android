@@ -1,0 +1,643 @@
+{
+  "version": 1,
+  "metadata": {
+    "palette": [
+      {
+        "id": 1,
+        "label": "Red",
+        "rgba": [
+          220,
+          64,
+          64,
+          255
+        ]
+      },
+      {
+        "id": 2,
+        "label": "Blue",
+        "rgba": [
+          74,
+          124,
+          232,
+          255
+        ]
+      },
+      {
+        "id": 3,
+        "label": "Green",
+        "rgba": [
+          52,
+          168,
+          83,
+          255
+        ]
+      },
+      {
+        "id": 4,
+        "label": "Yellow",
+        "rgba": [
+          244,
+          180,
+          0,
+          255
+        ]
+      }
+    ],
+    "region_color_map": [
+      {
+        "region_id": 1,
+        "palette_color_id": 1
+      },
+      {
+        "region_id": 5,
+        "palette_color_id": 2
+      },
+      {
+        "region_id": 4,
+        "palette_color_id": 3
+      },
+      {
+        "region_id": 3,
+        "palette_color_id": 4
+      },
+      {
+        "region_id": 2,
+        "palette_color_id": 2
+      }
+    ]
+  },
+  "image_curve_data": {
+    "image_path": null,
+    "bounds": [
+      1200.0,
+      800.0
+    ],
+    "regions": [
+      {
+        "id": 1,
+        "number": 1,
+        "number_position": [
+          200.0,
+          566.6666
+        ],
+        "target_palette_id": 1
+      },
+      {
+        "id": 5,
+        "number": 2,
+        "number_position": [
+          733.12915,
+          413.3264
+        ],
+        "target_palette_id": 2
+      },
+      {
+        "id": 4,
+        "number": 3,
+        "number_position": [
+          650.8214,
+          236.05026
+        ],
+        "target_palette_id": 3
+      },
+      {
+        "id": 3,
+        "number": 4,
+        "number_position": [
+          513.7179,
+          472.16122
+        ],
+        "target_palette_id": 4
+      },
+      {
+        "id": 2,
+        "number": 2,
+        "number_position": [
+          431.44525,
+          301.62415
+        ],
+        "target_palette_id": 2
+      }
+    ],
+    "topology": {
+      "vertices": [
+        {
+          "id": 1,
+          "pos": [
+            0.0,
+            800.0
+          ]
+        },
+        {
+          "id": 2,
+          "pos": [
+            0.0,
+            0.0
+          ]
+        },
+        {
+          "id": 3,
+          "pos": [
+            1200.0,
+            0.0
+          ]
+        },
+        {
+          "id": 4,
+          "pos": [
+            1200.0,
+            800.0
+          ]
+        },
+        {
+          "id": 5,
+          "pos": [
+            295.11877,
+            389.29102
+          ]
+        },
+        {
+          "id": 6,
+          "pos": [
+            528.40106,
+            395.73123
+          ]
+        },
+        {
+          "id": 7,
+          "pos": [
+            404.41373,
+            392.30832
+          ]
+        },
+        {
+          "id": 8,
+          "pos": [
+            401.26205,
+            520.6199
+          ]
+        },
+        {
+          "id": 9,
+          "pos": [
+            470.23013,
+            566.4486
+          ]
+        },
+        {
+          "id": 10,
+          "pos": [
+            599.26227,
+            555.67926
+          ]
+        },
+        {
+          "id": 11,
+          "pos": [
+            639.1286,
+            387.85727
+          ]
+        },
+        {
+          "id": 12,
+          "pos": [
+            619.1537,
+            471.9441
+          ]
+        },
+        {
+          "id": 13,
+          "pos": [
+            642.14923,
+            516.5089
+          ]
+        },
+        {
+          "id": 14,
+          "pos": [
+            838.7203,
+            534.1453
+          ]
+        },
+        {
+          "id": 15,
+          "pos": [
+            876.3688,
+            452.93707
+          ]
+        },
+        {
+          "id": 16,
+          "pos": [
+            747.97003,
+            260.78748
+          ]
+        },
+        {
+          "id": 17,
+          "pos": [
+            782.7162,
+            245.55957
+          ]
+        },
+        {
+          "id": 18,
+          "pos": [
+            752.1204,
+            118.170006
+          ]
+        },
+        {
+          "id": 19,
+          "pos": [
+            567.525,
+            150.92334
+          ]
+        },
+        {
+          "id": 20,
+          "pos": [
+            570.73126,
+            257.15015
+          ]
+        },
+        {
+          "id": 21,
+          "pos": [
+            364.67148,
+            170.74052
+          ]
+        },
+        {
+          "id": 22,
+          "pos": [
+            597.84644,
+            390.79288
+          ]
+        },
+        {
+          "id": 23,
+          "pos": [
+            623.2739,
+            315.43707
+          ]
+        }
+      ],
+      "edges": [
+        {
+          "id": 1,
+          "start": 1,
+          "end": 2
+        },
+        {
+          "id": 2,
+          "start": 2,
+          "end": 3
+        },
+        {
+          "id": 3,
+          "start": 3,
+          "end": 4
+        },
+        {
+          "id": 4,
+          "start": 4,
+          "end": 1
+        },
+        {
+          "id": 5,
+          "start": 5,
+          "end": 6
+        },
+        {
+          "id": 6,
+          "start": 6,
+          "end": 7
+        },
+        {
+          "id": 7,
+          "start": 7,
+          "end": 8
+        },
+        {
+          "id": 8,
+          "start": 8,
+          "end": 9
+        },
+        {
+          "id": 9,
+          "start": 9,
+          "end": 10
+        },
+        {
+          "id": 10,
+          "start": 10,
+          "end": 11
+        },
+        {
+          "id": 11,
+          "start": 11,
+          "end": 12
+        },
+        {
+          "id": 12,
+          "start": 12,
+          "end": 13
+        },
+        {
+          "id": 13,
+          "start": 13,
+          "end": 14
+        },
+        {
+          "id": 14,
+          "start": 14,
+          "end": 15
+        },
+        {
+          "id": 15,
+          "start": 15,
+          "end": 16
+        },
+        {
+          "id": 16,
+          "start": 16,
+          "end": 17
+        },
+        {
+          "id": 17,
+          "start": 17,
+          "end": 18
+        },
+        {
+          "id": 18,
+          "start": 18,
+          "end": 19
+        },
+        {
+          "id": 19,
+          "start": 19,
+          "end": 20
+        },
+        {
+          "id": 20,
+          "start": 20,
+          "end": 21
+        },
+        {
+          "id": 21,
+          "start": 21,
+          "end": 5
+        },
+        {
+          "id": 22,
+          "start": 11,
+          "end": 22
+        },
+        {
+          "id": 23,
+          "start": 22,
+          "end": 23
+        },
+        {
+          "id": 24,
+          "start": 23,
+          "end": 16
+        },
+        {
+          "id": 25,
+          "start": 22,
+          "end": 6
+        },
+        {
+          "id": 26,
+          "start": 6,
+          "end": 20
+        }
+      ],
+      "regions": [
+        {
+          "region_id": 1,
+          "outer": [
+            {
+              "edge_id": 1,
+              "reversed": false
+            },
+            {
+              "edge_id": 2,
+              "reversed": false
+            },
+            {
+              "edge_id": 3,
+              "reversed": false
+            },
+            {
+              "edge_id": 4,
+              "reversed": false
+            }
+          ],
+          "holes": [
+            [
+              {
+                "edge_id": 5,
+                "reversed": false
+              },
+              {
+                "edge_id": 6,
+                "reversed": false
+              },
+              {
+                "edge_id": 7,
+                "reversed": false
+              },
+              {
+                "edge_id": 8,
+                "reversed": false
+              },
+              {
+                "edge_id": 9,
+                "reversed": false
+              },
+              {
+                "edge_id": 10,
+                "reversed": false
+              },
+              {
+                "edge_id": 11,
+                "reversed": false
+              },
+              {
+                "edge_id": 12,
+                "reversed": false
+              },
+              {
+                "edge_id": 13,
+                "reversed": false
+              },
+              {
+                "edge_id": 14,
+                "reversed": false
+              },
+              {
+                "edge_id": 15,
+                "reversed": false
+              },
+              {
+                "edge_id": 16,
+                "reversed": false
+              },
+              {
+                "edge_id": 17,
+                "reversed": false
+              },
+              {
+                "edge_id": 18,
+                "reversed": false
+              },
+              {
+                "edge_id": 19,
+                "reversed": false
+              },
+              {
+                "edge_id": 20,
+                "reversed": false
+              },
+              {
+                "edge_id": 21,
+                "reversed": false
+              }
+            ]
+          ]
+        },
+        {
+          "region_id": 5,
+          "outer": [
+            {
+              "edge_id": 22,
+              "reversed": false
+            },
+            {
+              "edge_id": 23,
+              "reversed": false
+            },
+            {
+              "edge_id": 24,
+              "reversed": false
+            },
+            {
+              "edge_id": 15,
+              "reversed": true
+            },
+            {
+              "edge_id": 14,
+              "reversed": true
+            },
+            {
+              "edge_id": 13,
+              "reversed": true
+            },
+            {
+              "edge_id": 12,
+              "reversed": true
+            },
+            {
+              "edge_id": 11,
+              "reversed": true
+            }
+          ]
+        },
+        {
+          "region_id": 4,
+          "outer": [
+            {
+              "edge_id": 25,
+              "reversed": false
+            },
+            {
+              "edge_id": 26,
+              "reversed": false
+            },
+            {
+              "edge_id": 19,
+              "reversed": true
+            },
+            {
+              "edge_id": 18,
+              "reversed": true
+            },
+            {
+              "edge_id": 17,
+              "reversed": true
+            },
+            {
+              "edge_id": 16,
+              "reversed": true
+            },
+            {
+              "edge_id": 24,
+              "reversed": true
+            },
+            {
+              "edge_id": 23,
+              "reversed": true
+            }
+          ]
+        },
+        {
+          "region_id": 3,
+          "outer": [
+            {
+              "edge_id": 8,
+              "reversed": true
+            },
+            {
+              "edge_id": 7,
+              "reversed": true
+            },
+            {
+              "edge_id": 6,
+              "reversed": true
+            },
+            {
+              "edge_id": 25,
+              "reversed": true
+            },
+            {
+              "edge_id": 22,
+              "reversed": true
+            },
+            {
+              "edge_id": 10,
+              "reversed": true
+            },
+            {
+              "edge_id": 9,
+              "reversed": true
+            }
+          ]
+        },
+        {
+          "region_id": 2,
+          "outer": [
+            {
+              "edge_id": 5,
+              "reversed": true
+            },
+            {
+              "edge_id": 21,
+              "reversed": true
+            },
+            {
+              "edge_id": 20,
+              "reversed": true
+            },
+            {
+              "edge_id": 26,
+              "reversed": true
+            }
+          ]
+        }
+      ]
+    }
+  }
+}

@@ -16,6 +16,12 @@ object PuzzleCatalog {
             previewAssetPath = "previews/image1_preview.png",
         ),
         PuzzleListItem(
+            id = "image2",
+            displayName = "Image 2",
+            puzzleAssetPath = "puzzles/image2.cbn",
+            previewAssetPath = "previews/image2_preview.png",
+        ),
+        PuzzleListItem(
             id = "topology_new_3",
             displayName = "Topology New 3",
             puzzleAssetPath = "puzzles/topology_new_3.cbn",
