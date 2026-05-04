@@ -137,4 +137,62 @@ class PuzzleTopologyTest {
         assertTrue(PuzzleTopology.pointInShape(PuzzlePoint(1f, 1f), shape))
         assertEquals(false, PuzzleTopology.pointInShape(PuzzlePoint(5f, 5f), shape))
     }
+
+    @Test
+    fun `regionShape drops forward backward edge loop`() {
+        val topology = DocumentTopology(
+            vertices = listOf(
+                TopologyVertex(1, PuzzlePoint(0f, 0f)),
+                TopologyVertex(2, PuzzlePoint(10f, 0f)),
+            ),
+            edges = listOf(
+                TopologyEdge(1, start = 1, end = 2),
+            ),
+            regions = listOf(
+                TopologyRegionBoundary(
+                    regionId = 8,
+                    outer = listOf(
+                        RegionEdgeRef(edgeId = 1, reversed = false),
+                        RegionEdgeRef(edgeId = 1, reversed = true),
+                    ),
+                    holes = emptyList(),
+                ),
+            ),
+        )
+
+        val shape = PuzzleTopology.regionShape(topology, regionId = 8)
+
+        assertNull(shape)
+    }
+
+    @Test
+    fun `regionShape drops tiny sliver polygon`() {
+        val topology = DocumentTopology(
+            vertices = listOf(
+                TopologyVertex(20, PuzzlePoint(430.61777f, 337.41113f)),
+                TopologyVertex(21, PuzzlePoint(399.122f, 340.46884f)),
+                TopologyVertex(22, PuzzlePoint(465.73868f, 334.00146f)),
+            ),
+            edges = listOf(
+                TopologyEdge(20, start = 20, end = 21),
+                TopologyEdge(21, start = 21, end = 22),
+                TopologyEdge(22, start = 22, end = 20),
+            ),
+            regions = listOf(
+                TopologyRegionBoundary(
+                    regionId = 6,
+                    outer = listOf(
+                        RegionEdgeRef(edgeId = 20, reversed = false),
+                        RegionEdgeRef(edgeId = 21, reversed = false),
+                        RegionEdgeRef(edgeId = 22, reversed = false),
+                    ),
+                    holes = emptyList(),
+                ),
+            ),
+        )
+
+        val shape = PuzzleTopology.regionShape(topology, regionId = 6)
+
+        assertNull(shape)
+    }
 }

@@ -4,6 +4,8 @@ import android.util.Log
 
 object PuzzleTopology {
     private const val TAG = "PuzzleTopology"
+    private const val EPSILON = 0.00001f
+    private const val MIN_REGION_AREA = 1f
 
     fun buildLoadedPuzzle(document: PuzzleDocument, palette: List<PaletteColor>): LoadedPuzzle {
         val renderRegions = document.regions.mapNotNull { region ->
@@ -137,16 +139,39 @@ object PuzzleTopology {
         }
 
         polygon.removeLast()
+        return sanitizeLoop(polygon)
+    }
 
+    private fun sanitizeLoop(points: List<PuzzlePoint>): List<PuzzlePoint>? {
         val normalized = mutableListOf<PuzzlePoint>()
-        polygon.forEach { point ->
+        points.forEach { point ->
             if (normalized.lastOrNull() != point) {
                 normalized += point
             }
         }
 
-        return normalized.takeIf { it.size >= 3 }
+        if (normalized.size >= 2 && normalized.first() == normalized.last()) {
+            normalized.removeLast()
+        }
+
+        if (normalized.distinct().size < 3) {
+            return null
+        }
+
+        return normalized.takeIf { polygonArea(it) > MIN_REGION_AREA }
     }
 
-    private const val EPSILON = 0.00001f
+    private fun polygonArea(points: List<PuzzlePoint>): Float {
+        if (points.size < 3) {
+            return 0f
+        }
+
+        var area = 0f
+        for (index in points.indices) {
+            val current = points[index]
+            val next = points[(index + 1) % points.size]
+            area += current.x * next.y - next.x * current.y
+        }
+        return kotlin.math.abs(area) * 0.5f
+    }
 }
