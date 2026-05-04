@@ -2,6 +2,7 @@ package network.bahn.colorbynumber.android.coloring
 
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class PuzzleJsonParserTest {
@@ -49,8 +50,13 @@ class PuzzleJsonParserTest {
                   "regions": [
                     {
                       "region_id": 2,
-                      "boundary": [
+                      "outer": [
                         { "edge_id": 1, "reversed": false }
+                      ],
+                      "holes": [
+                        [
+                          { "edge_id": 1, "reversed": true }
+                        ]
                       ]
                     }
                   ]
@@ -70,7 +76,50 @@ class PuzzleJsonParserTest {
         assertEquals("palette_1.cbnpalette", document.paletteLink?.path)
         assertEquals(1, document.embeddedPalette.size)
         assertEquals(1, document.topology.edges.size)
-        assertEquals(1, document.topology.regions.first().boundary.size)
+        assertEquals(1, document.topology.regions.first().outer.size)
+        assertEquals(1, document.topology.regions.first().holes.size)
+    }
+
+    @Test
+    fun `parseDocument falls back to legacy boundary field`() {
+        val json = """
+            {
+              "version": 1,
+              "metadata": {},
+              "image_curve_data": {
+                "bounds": [100.0, 100.0],
+                "regions": [
+                  {
+                    "id": 9,
+                    "number": 1,
+                    "number_position": [10.0, 10.0]
+                  }
+                ],
+                "topology": {
+                  "vertices": [
+                    { "id": 1, "pos": [0.0, 0.0] },
+                    { "id": 2, "pos": [10.0, 0.0] }
+                  ],
+                  "edges": [
+                    { "id": 1, "start": 1, "end": 2 }
+                  ],
+                  "regions": [
+                    {
+                      "region_id": 9,
+                      "boundary": [
+                        { "edge_id": 1, "reversed": false }
+                      ]
+                    }
+                  ]
+                }
+              }
+            }
+        """.trimIndent()
+
+        val document = PuzzleJsonParser.parseDocument(json)
+
+        assertEquals(1, document.topology.regions.single().outer.size)
+        assertTrue(document.topology.regions.single().holes.isEmpty())
     }
 
     @Test

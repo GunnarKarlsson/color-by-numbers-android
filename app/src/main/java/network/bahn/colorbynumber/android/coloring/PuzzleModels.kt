@@ -91,7 +91,8 @@ data class RegionEdgeRef(
 
 data class TopologyRegionBoundary(
     val regionId: Int,
-    val boundary: List<RegionEdgeRef>,
+    val outer: List<RegionEdgeRef>,
+    val holes: List<List<RegionEdgeRef>>,
 )
 
 data class DocumentTopology(
@@ -114,9 +115,14 @@ data class OutlineSegment(
     val end: PuzzlePoint,
 )
 
+data class RenderShape(
+    val outer: List<PuzzlePoint>,
+    val holes: List<List<PuzzlePoint>>,
+)
+
 data class RenderRegion(
     val region: PuzzleRegion,
-    val polygon: List<PuzzlePoint>,
+    val shape: RenderShape,
 )
 
 data class LoadedPuzzle(

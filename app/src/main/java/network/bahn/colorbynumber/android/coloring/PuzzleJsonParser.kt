@@ -74,7 +74,8 @@ private fun EdgeEntry.toTopologyEdge(): TopologyEdge =
 private fun TopologyRegionEntry.toTopologyRegionBoundary(): TopologyRegionBoundary =
     TopologyRegionBoundary(
         regionId = regionId,
-        boundary = boundary.orEmpty().map { it.toRegionEdgeRef() },
+        outer = (outer ?: boundary).orEmpty().map { it.toRegionEdgeRef() },
+        holes = holes.orEmpty().map { loop -> loop.orEmpty().map { it.toRegionEdgeRef() } },
     )
 
 private fun RegionEdgeRefEntry.toRegionEdgeRef(): RegionEdgeRef =
@@ -179,6 +180,10 @@ private data class EdgeEntry(
 private data class TopologyRegionEntry(
     @SerializedName("region_id")
     val regionId: Int = 0,
+    @SerializedName("outer")
+    val outer: List<RegionEdgeRefEntry>? = null,
+    @SerializedName("holes")
+    val holes: List<List<RegionEdgeRefEntry>?>? = emptyList(),
     @SerializedName("boundary")
     val boundary: List<RegionEdgeRefEntry>? = emptyList(),
 )

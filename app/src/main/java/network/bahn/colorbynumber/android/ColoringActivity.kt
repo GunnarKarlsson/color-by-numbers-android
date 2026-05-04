@@ -50,6 +50,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.PathFillType
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.nativeCanvas
@@ -76,6 +77,7 @@ import network.bahn.colorbynumber.android.coloring.PuzzlePoint
 import network.bahn.colorbynumber.android.coloring.PuzzleProgressStore
 import network.bahn.colorbynumber.android.coloring.PuzzleSession
 import network.bahn.colorbynumber.android.coloring.PuzzleTopology
+import network.bahn.colorbynumber.android.coloring.RenderShape
 import network.bahn.colorbynumber.android.ui.theme.ColorByNumberTheme
 
 class ColoringActivity : ComponentActivity() {
@@ -398,7 +400,7 @@ private fun PuzzleCanvas(
             val fillColor = session.fillsByRegionId[renderRegion.region.id]
                 ?.let { paletteById[it]?.composeColor }
                 ?: Color(0xFFF7F7F7)
-            val path = polygonPath(renderRegion.polygon, currentTransform)
+            val path = shapePath(renderRegion.shape, currentTransform)
             drawPath(
                 path = path,
                 color = fillColor,
@@ -441,8 +443,19 @@ private fun DrawScope.drawOutline(segment: OutlineSegment, transform: ScreenTran
     )
 }
 
-private fun polygonPath(points: List<PuzzlePoint>, transform: ScreenTransform): Path {
-    val path = Path()
+private fun shapePath(shape: RenderShape, transform: ScreenTransform): Path {
+    val path = Path().apply {
+        fillType = PathFillType.EvenOdd
+    }
+
+    addContour(path, shape.outer, transform)
+    shape.holes.forEach { hole ->
+        addContour(path, hole, transform)
+    }
+    return path
+}
+
+private fun addContour(path: Path, points: List<PuzzlePoint>, transform: ScreenTransform) {
     points.forEachIndexed { index, point ->
         val mapped = transform.toScreen(point)
         if (index == 0) {
@@ -452,7 +465,6 @@ private fun polygonPath(points: List<PuzzlePoint>, transform: ScreenTransform): 
         }
     }
     path.close()
-    return path
 }
 
 @Composable

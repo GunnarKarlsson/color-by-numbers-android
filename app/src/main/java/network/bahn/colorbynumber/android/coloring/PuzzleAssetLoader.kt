@@ -25,13 +25,16 @@ class PuzzleAssetLoader(
             return embeddedPalette
         }
 
-        val linkedPath = resolveSiblingAssetPath(assetPath, paletteLink.path)
-        return try {
-            PuzzleJsonParser.parsePalette(readAsset(linkedPath))
-        } catch (error: Exception) {
-            Log.w(TAG, "Falling back to embedded palette because $linkedPath could not be loaded.", error)
-            embeddedPalette
+        for (candidate in paletteAssetCandidates(assetPath, paletteLink.path)) {
+            try {
+                return PuzzleJsonParser.parsePalette(readAsset(candidate))
+            } catch (_: Exception) {
+                // Try the next candidate path before falling back to the embedded palette.
+            }
         }
+
+        Log.w(TAG, "Falling back to embedded palette because ${paletteLink.path} could not be loaded.")
+        return embeddedPalette
     }
 
     private fun readAsset(assetPath: String): String =
@@ -40,6 +43,19 @@ class PuzzleAssetLoader(
     private fun resolveSiblingAssetPath(assetPath: String, fileName: String): String {
         val parent = assetPath.substringBeforeLast('/', missingDelimiterValue = "")
         return if (parent.isEmpty()) fileName else "$parent/$fileName"
+    }
+
+    private fun paletteAssetCandidates(assetPath: String, linkedPath: String): List<String> {
+        val normalizedPath = linkedPath.replace('\\', '/').trim()
+        val fileName = normalizedPath.substringAfterLast('/')
+        return buildList {
+            if (normalizedPath.isNotEmpty() && !normalizedPath.startsWith("/")) {
+                add(normalizedPath)
+            }
+            if (fileName.isNotEmpty()) {
+                add(resolveSiblingAssetPath(assetPath, fileName))
+            }
+        }.distinct()
     }
 
     private companion object {

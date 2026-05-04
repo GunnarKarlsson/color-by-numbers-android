@@ -7,18 +7,21 @@ object PuzzleTopology {
 
     fun buildLoadedPuzzle(document: PuzzleDocument, palette: List<PaletteColor>): LoadedPuzzle {
         val renderRegions = document.regions.mapNotNull { region ->
-            val polygon = regionPolygon(document.topology, region.id)
-            if (polygon == null || polygon.size < 3) {
-                Log.w(TAG, "Skipping region ${region.id} because its polygon is invalid.")
+            val shape = regionShape(document.topology, region.id)
+            if (shape == null || shape.outer.size < 3) {
+                Log.w(TAG, "Skipping region ${region.id} because its shape is invalid.")
                 null
             } else {
-                RenderRegion(region = region, polygon = polygon)
+                RenderRegion(region = region, shape = shape)
             }
         }
 
         val worldPoints = buildList {
             addAll(document.topology.vertices.map { it.pos })
-            addAll(renderRegions.flatMap { it.polygon })
+            renderRegions.forEach { region ->
+                addAll(region.shape.outer)
+                region.shape.holes.forEach { addAll(it) }
+            }
             addAll(document.regions.map { it.numberPosition })
         }
 
@@ -37,37 +40,25 @@ object PuzzleTopology {
         )
     }
 
-    fun regionPolygon(topology: DocumentTopology, regionId: Int): List<PuzzlePoint>? {
+    fun regionShape(topology: DocumentTopology, regionId: Int): RenderShape? {
         val region = topology.regions.firstOrNull { it.regionId == regionId } ?: return null
-        if (region.boundary.isEmpty()) {
+        if (region.outer.isEmpty()) {
             return null
         }
 
         val edgeLookup = topology.edges.associateBy { it.id }
         val vertexLookup = topology.vertices.associateBy { it.id }
-        val polygon = mutableListOf<PuzzlePoint>()
-
-        for ((index, edgeRef) in region.boundary.withIndex()) {
-            val edge = edgeLookup[edgeRef.edgeId] ?: return null
-            val startVertexId = if (edgeRef.reversed) edge.end else edge.start
-            val endVertexId = if (edgeRef.reversed) edge.start else edge.end
-            val start = vertexLookup[startVertexId]?.pos ?: return null
-            val end = vertexLookup[endVertexId]?.pos ?: return null
-
-            if (index == 0) {
-                polygon += start
-            } else if (polygon.last() != start) {
-                return null
-            }
-
-            polygon += end
+        val outer = reconstructLoop(region.outer, edgeLookup, vertexLookup) ?: return null
+        val holes = mutableListOf<List<PuzzlePoint>>()
+        region.holes.forEach { loop ->
+            val hole = reconstructLoop(loop, edgeLookup, vertexLookup) ?: return null
+            holes += hole
         }
 
-        if (polygon.firstOrNull() == polygon.lastOrNull()) {
-            polygon.removeLast()
-        }
-
-        return polygon
+        return RenderShape(
+            outer = outer,
+            holes = holes,
+        )
     }
 
     fun uniqueSegments(topology: DocumentTopology): List<OutlineSegment> {
@@ -80,7 +71,10 @@ object PuzzleTopology {
     }
 
     fun hitTestRegion(renderRegions: List<RenderRegion>, point: PuzzlePoint): RenderRegion? =
-        renderRegions.firstOrNull { region -> pointInPolygon(point, region.polygon) }
+        renderRegions.firstOrNull { region -> pointInShape(point, region.shape) }
+
+    fun pointInShape(point: PuzzlePoint, shape: RenderShape): Boolean =
+        pointInPolygon(point, shape.outer) && shape.holes.none { hole -> pointInPolygon(point, hole) }
 
     fun pointInPolygon(point: PuzzlePoint, polygon: List<PuzzlePoint>): Boolean {
         if (polygon.size < 3) {
@@ -109,6 +103,49 @@ object PuzzleTopology {
         }
 
         return inside
+    }
+
+    private fun reconstructLoop(
+        edgeRefs: List<RegionEdgeRef>,
+        edgeLookup: Map<Int, TopologyEdge>,
+        vertexLookup: Map<Int, TopologyVertex>,
+    ): List<PuzzlePoint>? {
+        if (edgeRefs.isEmpty()) {
+            return null
+        }
+
+        val polygon = mutableListOf<PuzzlePoint>()
+
+        for ((index, edgeRef) in edgeRefs.withIndex()) {
+            val edge = edgeLookup[edgeRef.edgeId] ?: return null
+            val startVertexId = if (edgeRef.reversed) edge.end else edge.start
+            val endVertexId = if (edgeRef.reversed) edge.start else edge.end
+            val start = vertexLookup[startVertexId]?.pos ?: return null
+            val end = vertexLookup[endVertexId]?.pos ?: return null
+
+            if (index == 0) {
+                polygon += start
+            } else if (polygon.last() != start) {
+                return null
+            }
+
+            polygon += end
+        }
+
+        if (polygon.firstOrNull() != polygon.lastOrNull()) {
+            return null
+        }
+
+        polygon.removeLast()
+
+        val normalized = mutableListOf<PuzzlePoint>()
+        polygon.forEach { point ->
+            if (normalized.lastOrNull() != point) {
+                normalized += point
+            }
+        }
+
+        return normalized.takeIf { it.size >= 3 }
     }
 
     private const val EPSILON = 0.00001f

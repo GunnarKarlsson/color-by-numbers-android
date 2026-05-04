@@ -8,7 +8,7 @@ import org.junit.Test
 
 class PuzzleTopologyTest {
     @Test
-    fun `regionPolygon respects reversed edges`() {
+    fun `regionShape respects reversed edges`() {
         val topology = DocumentTopology(
             vertices = listOf(
                 TopologyVertex(1, PuzzlePoint(0f, 0f)),
@@ -25,19 +25,20 @@ class PuzzleTopologyTest {
             regions = listOf(
                 TopologyRegionBoundary(
                     regionId = 99,
-                    boundary = listOf(
+                    outer = listOf(
                         RegionEdgeRef(edgeId = 1, reversed = false),
                         RegionEdgeRef(edgeId = 2, reversed = true),
                         RegionEdgeRef(edgeId = 3, reversed = true),
                         RegionEdgeRef(edgeId = 4, reversed = true),
                     ),
+                    holes = emptyList(),
                 ),
             ),
         )
 
-        val polygon = PuzzleTopology.regionPolygon(topology, regionId = 99)
+        val shape = PuzzleTopology.regionShape(topology, regionId = 99)
 
-        assertNotNull(polygon)
+        assertNotNull(shape)
         assertEquals(
             listOf(
                 PuzzlePoint(0f, 0f),
@@ -45,7 +46,7 @@ class PuzzleTopologyTest {
                 PuzzlePoint(10f, 10f),
                 PuzzlePoint(0f, 10f),
             ),
-            polygon,
+            shape?.outer,
         )
     }
 
@@ -90,11 +91,14 @@ class PuzzleTopologyTest {
                 numberPosition = PuzzlePoint(5f, 5f),
                 targetPaletteId = 2,
             ),
-            polygon = listOf(
-                PuzzlePoint(0f, 0f),
-                PuzzlePoint(10f, 0f),
-                PuzzlePoint(10f, 10f),
-                PuzzlePoint(0f, 10f),
+            shape = RenderShape(
+                outer = listOf(
+                    PuzzlePoint(0f, 0f),
+                    PuzzlePoint(10f, 0f),
+                    PuzzlePoint(10f, 10f),
+                    PuzzlePoint(0f, 10f),
+                ),
+                holes = emptyList(),
             ),
         )
 
@@ -109,5 +113,28 @@ class PuzzleTopologyTest {
 
         assertEquals(region, hit)
         assertNull(miss)
+    }
+
+    @Test
+    fun `pointInShape excludes holes`() {
+        val shape = RenderShape(
+            outer = listOf(
+                PuzzlePoint(0f, 0f),
+                PuzzlePoint(10f, 0f),
+                PuzzlePoint(10f, 10f),
+                PuzzlePoint(0f, 10f),
+            ),
+            holes = listOf(
+                listOf(
+                    PuzzlePoint(3f, 3f),
+                    PuzzlePoint(7f, 3f),
+                    PuzzlePoint(7f, 7f),
+                    PuzzlePoint(3f, 7f),
+                ),
+            ),
+        )
+
+        assertTrue(PuzzleTopology.pointInShape(PuzzlePoint(1f, 1f), shape))
+        assertEquals(false, PuzzleTopology.pointInShape(PuzzlePoint(5f, 5f), shape))
     }
 }
