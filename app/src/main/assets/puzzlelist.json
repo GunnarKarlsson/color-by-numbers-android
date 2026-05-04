@@ -28,5 +28,11 @@
     "displayName": "Image 5",
     "puzzleAssetPath": "puzzles/image5.cbn",
     "previewAssetPath": "previews/image5_preview.png"
+  },
+  {
+    "id": "image6",
+    "displayName": "Dotty Flower",
+    "puzzleAssetPath": "puzzles/image6.cbn",
+    "previewAssetPath": "previews/image6_preview.png"
   }
 ]
