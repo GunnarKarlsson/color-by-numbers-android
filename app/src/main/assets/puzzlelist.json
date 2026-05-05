@@ -6,6 +6,12 @@
     "previewAssetPath": "previews/image1_preview.png"
   },
   {
+    "id": "image7",
+    "displayName": "Image 7",
+    "puzzleAssetPath": "puzzles/image7.cbn",
+    "previewAssetPath": "previews/image7_preview.png"
+  },
+  {
     "id": "image2",
     "displayName": "Image 2",
     "puzzleAssetPath": "puzzles/image2.cbn",
