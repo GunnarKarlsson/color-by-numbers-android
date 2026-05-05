@@ -8,6 +8,10 @@ object PuzzleTopology {
     private const val MIN_REGION_AREA = 1f
 
     fun buildLoadedPuzzle(document: PuzzleDocument, palette: List<PaletteColor>): LoadedPuzzle {
+        if (document.imageType == ImageType.Pixelated) {
+            return buildLoadedPixelPuzzle(document, palette)
+        }
+
         val renderRegions = document.regions.mapNotNull { region ->
             val shape = regionShape(document.topology, region.id)
             if (shape == null || shape.outer.size < 3) {
@@ -39,6 +43,22 @@ object PuzzleTopology {
             renderRegions = renderRegions,
             outlineSegments = uniqueSegments(document.topology),
             worldBounds = worldBounds,
+        )
+    }
+
+    private fun buildLoadedPixelPuzzle(document: PuzzleDocument, palette: List<PaletteColor>): LoadedPuzzle {
+        val bounds = PuzzleBounds(
+            minX = 0f,
+            minY = 0f,
+            maxX = document.bounds.x,
+            maxY = document.bounds.y,
+        )
+        return LoadedPuzzle(
+            document = document,
+            palette = palette,
+            renderRegions = emptyList(),
+            outlineSegments = emptyList(),
+            worldBounds = bounds,
         )
     }
 
@@ -74,6 +94,22 @@ object PuzzleTopology {
 
     fun hitTestRegion(renderRegions: List<RenderRegion>, point: PuzzlePoint): RenderRegion? =
         renderRegions.firstOrNull { region -> pointInShape(point, region.shape) }
+
+    fun hitTestCell(document: PuzzleDocument, point: PuzzlePoint): PixelCell? {
+        val grid = document.pixelGrid ?: return null
+        if (grid.rows <= 0 || grid.cols <= 0) {
+            return null
+        }
+        if (point.x < 0f || point.y < 0f || point.x >= document.bounds.x || point.y >= document.bounds.y) {
+            return null
+        }
+
+        val cellWidth = document.bounds.x / grid.cols.toFloat()
+        val cellHeight = document.bounds.y / grid.rows.toFloat()
+        val col = (point.x / cellWidth).toInt()
+        val row = (point.y / cellHeight).toInt()
+        return grid.cells.firstOrNull { it.row == row && it.col == col }
+    }
 
     fun pointInShape(point: PuzzlePoint, shape: RenderShape): Boolean =
         pointInPolygon(point, shape.outer) && shape.holes.none { hole -> pointInPolygon(point, hole) }

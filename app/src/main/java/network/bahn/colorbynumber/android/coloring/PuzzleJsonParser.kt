@@ -2,10 +2,20 @@ package network.bahn.colorbynumber.android.coloring
 
 import com.google.gson.Gson
 import com.google.gson.GsonBuilder
+import com.google.gson.JsonParser
 import com.google.gson.annotations.SerializedName
 
 internal object PuzzleJsonParser {
     private val gson: Gson = GsonBuilder().create()
+
+    fun parseImageType(json: String): ImageType {
+        val root = JsonParser.parseString(json).asJsonObject
+        val encoded = root.get("image_type")?.asString
+        return when (encoded?.lowercase()) {
+            "pixelated" -> ImageType.Pixelated
+            else -> ImageType.Standard
+        }
+    }
 
     fun parseDocument(json: String): PuzzleDocument {
         val root = gson.fromJson(json, PuzzleDocumentFile::class.java)
@@ -16,11 +26,49 @@ internal object PuzzleJsonParser {
 
         return PuzzleDocument(
             version = root.version,
+            imageType = root.imageType ?: ImageType.Standard,
             bounds = bounds,
             regions = imageCurveData.regions.orEmpty().map { it.toPuzzleRegion() },
             embeddedPalette = metadata.palette.orEmpty().map { it.toPaletteColor() },
             paletteLink = metadata.paletteLink?.toPaletteLink(),
+            pixelGrid = null,
             topology = topology,
+        )
+    }
+
+    fun parsePixelatedDocument(json: String): PuzzleDocument {
+        val root = gson.fromJson(json, PixelatedDocumentFile::class.java)
+        val metadata = requireNotNull(root.metadata) { "Puzzle document is missing metadata." }
+        val pixelData = requireNotNull(root.pixelData) { "Puzzle document is missing pixel_data." }
+        val bounds = requireNotNull(pixelData.bounds?.toPoint()) { "Puzzle document is missing bounds." }
+        val rows = pixelData.rows ?: error("Puzzle document is missing pixel grid rows.")
+        val cols = pixelData.cols ?: error("Puzzle document is missing pixel grid cols.")
+        val cells = pixelData.cells.orEmpty().map { it.toPixelCell() }.associateBy { it.id }.toMutableMap()
+
+        metadata.cellColorMap.orEmpty().forEach { entry ->
+            val cellId = entry.cellId ?: return@forEach
+            val paletteColorId = entry.paletteColorId ?: return@forEach
+            val current = cells[cellId] ?: return@forEach
+            cells[cellId] = current.copy(targetPaletteId = paletteColorId)
+        }
+
+        return PuzzleDocument(
+            version = root.version,
+            imageType = ImageType.Pixelated,
+            bounds = bounds,
+            regions = emptyList(),
+            embeddedPalette = metadata.palette.orEmpty().map { it.toPaletteColor() },
+            paletteLink = metadata.paletteLink?.toPaletteLink(),
+            pixelGrid = PixelGridDocument(
+                rows = rows,
+                cols = cols,
+                cells = cells.values.sortedBy { it.id },
+            ),
+            topology = DocumentTopology(
+                vertices = emptyList(),
+                edges = emptyList(),
+                regions = emptyList(),
+            ),
         )
     }
 
@@ -48,6 +96,14 @@ private fun RegionEntry.toPuzzleRegion(): PuzzleRegion =
         id = id,
         number = number,
         numberPosition = requireNotNull(numberPosition.toPoint()) { "Region $id is missing number_position." },
+        targetPaletteId = targetPaletteId,
+    )
+
+private fun PixelCellEntry.toPixelCell(): PixelCell =
+    PixelCell(
+        id = id,
+        row = row,
+        col = col,
         targetPaletteId = targetPaletteId,
     )
 
@@ -98,15 +154,37 @@ private fun List<Float>?.toPoint(): PuzzlePoint? {
 private data class PuzzleDocumentFile(
     @SerializedName("version")
     val version: Int = 0,
+    @SerializedName("image_type")
+    val imageType: ImageType? = null,
     @SerializedName("metadata")
     val metadata: MetadataEntry? = null,
     @SerializedName("image_curve_data")
     val imageCurveData: ImageCurveDataEntry? = null,
 )
 
+private data class PixelatedDocumentFile(
+    @SerializedName("version")
+    val version: Int = 0,
+    @SerializedName("image_type")
+    val imageType: String? = null,
+    @SerializedName("metadata")
+    val metadata: PixelMetadataEntry? = null,
+    @SerializedName("pixel_data")
+    val pixelData: PixelDataEntry? = null,
+)
+
 private data class MetadataEntry(
     @SerializedName("palette")
     val palette: List<PaletteColorEntry>? = emptyList(),
+    @SerializedName("palette_link")
+    val paletteLink: PaletteLinkEntry? = null,
+)
+
+private data class PixelMetadataEntry(
+    @SerializedName("palette")
+    val palette: List<PaletteColorEntry>? = emptyList(),
+    @SerializedName("cell_color_map")
+    val cellColorMap: List<CellColorMapEntry>? = emptyList(),
     @SerializedName("palette_link")
     val paletteLink: PaletteLinkEntry? = null,
 )
@@ -118,6 +196,17 @@ private data class ImageCurveDataEntry(
     val regions: List<RegionEntry>? = emptyList(),
     @SerializedName("topology")
     val topology: TopologyEntry? = null,
+)
+
+private data class PixelDataEntry(
+    @SerializedName("bounds")
+    val bounds: List<Float>? = null,
+    @SerializedName("rows")
+    val rows: Int? = null,
+    @SerializedName("cols")
+    val cols: Int? = null,
+    @SerializedName("cells")
+    val cells: List<PixelCellEntry>? = emptyList(),
 )
 
 private data class PaletteFile(
@@ -150,6 +239,24 @@ private data class RegionEntry(
     val numberPosition: List<Float>? = null,
     @SerializedName("target_palette_id")
     val targetPaletteId: Int? = null,
+)
+
+private data class PixelCellEntry(
+    @SerializedName("id")
+    val id: Int = 0,
+    @SerializedName("row")
+    val row: Int = 0,
+    @SerializedName("col")
+    val col: Int = 0,
+    @SerializedName("target_palette_id")
+    val targetPaletteId: Int? = null,
+)
+
+private data class CellColorMapEntry(
+    @SerializedName("cell_id")
+    val cellId: Int? = null,
+    @SerializedName("palette_color_id")
+    val paletteColorId: Int? = null,
 )
 
 private data class TopologyEntry(

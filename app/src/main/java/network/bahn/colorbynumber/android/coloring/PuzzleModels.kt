@@ -66,11 +66,29 @@ data class PaletteLink(
     val path: String,
 )
 
+enum class ImageType {
+    Standard,
+    Pixelated,
+}
+
 data class PuzzleRegion(
     val id: Int,
     val number: Int,
     val numberPosition: PuzzlePoint,
     val targetPaletteId: Int?,
+)
+
+data class PixelCell(
+    val id: Int,
+    val row: Int,
+    val col: Int,
+    val targetPaletteId: Int?,
+)
+
+data class PixelGridDocument(
+    val rows: Int,
+    val cols: Int,
+    val cells: List<PixelCell>,
 )
 
 data class TopologyVertex(
@@ -103,10 +121,12 @@ data class DocumentTopology(
 
 data class PuzzleDocument(
     val version: Int,
+    val imageType: ImageType,
     val bounds: PuzzlePoint,
     val regions: List<PuzzleRegion>,
     val embeddedPalette: List<PaletteColor>,
     val paletteLink: PaletteLink?,
+    val pixelGrid: PixelGridDocument?,
     val topology: DocumentTopology,
 )
 
@@ -131,7 +151,13 @@ data class LoadedPuzzle(
     val renderRegions: List<RenderRegion>,
     val outlineSegments: List<OutlineSegment>,
     val worldBounds: PuzzleBounds,
-)
+) {
+    val isPixelated: Boolean
+        get() = document.imageType == ImageType.Pixelated
+
+    val totalFillTargets: Int
+        get() = document.pixelGrid?.cells?.size ?: document.regions.size
+}
 
 data class PuzzleSession(
     val selectedPaletteId: Int? = null,

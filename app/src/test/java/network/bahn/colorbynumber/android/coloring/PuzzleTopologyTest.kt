@@ -116,6 +116,39 @@ class PuzzleTopologyTest {
     }
 
     @Test
+    fun `hitTestCell returns matching pixel cell`() {
+        val document = PuzzleDocument(
+            version = 1,
+            imageType = ImageType.Pixelated,
+            bounds = PuzzlePoint(40f, 40f),
+            regions = emptyList(),
+            embeddedPalette = emptyList(),
+            paletteLink = null,
+            pixelGrid = PixelGridDocument(
+                rows = 2,
+                cols = 2,
+                cells = listOf(
+                    PixelCell(id = 1, row = 0, col = 0, targetPaletteId = 1),
+                    PixelCell(id = 2, row = 0, col = 1, targetPaletteId = 1),
+                    PixelCell(id = 3, row = 1, col = 0, targetPaletteId = 2),
+                    PixelCell(id = 4, row = 1, col = 1, targetPaletteId = 2),
+                ),
+            ),
+            topology = DocumentTopology(
+                vertices = emptyList(),
+                edges = emptyList(),
+                regions = emptyList(),
+            ),
+        )
+
+        val hit = PuzzleTopology.hitTestCell(document, PuzzlePoint(25f, 5f))
+        val miss = PuzzleTopology.hitTestCell(document, PuzzlePoint(50f, 5f))
+
+        assertEquals(2, hit?.id)
+        assertNull(miss)
+    }
+
+    @Test
     fun `pointInShape excludes holes`() {
         val shape = RenderShape(
             outer = listOf(

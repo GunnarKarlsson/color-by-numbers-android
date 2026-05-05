@@ -41,12 +41,18 @@ class PuzzleProgressStore(
             return emptyMap()
         }
 
-        val targetPaletteByRegionId = document.regions.associate { region -> region.id to region.targetPaletteId }
+        val targetPaletteByFillId = when (document.imageType) {
+            ImageType.Pixelated -> document.pixelGrid
+                ?.cells
+                ?.associate { cell -> cell.id to cell.targetPaletteId }
+                .orEmpty()
+            ImageType.Standard -> document.regions.associate { region -> region.id to region.targetPaletteId }
+        }
         return buildMap {
             progress.filledRegions.orEmpty().forEach { entry ->
                 val regionId = entry.regionId ?: return@forEach
                 val paletteColorId = entry.paletteColorId ?: return@forEach
-                if (targetPaletteByRegionId[regionId] == paletteColorId) {
+                if (targetPaletteByFillId[regionId] == paletteColorId) {
                     put(regionId, paletteColorId)
                 }
             }

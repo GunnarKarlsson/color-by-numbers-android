@@ -79,6 +79,48 @@ class PuzzleProgressStoreTest {
     }
 
     @Test
+    fun `loadProgress restores matching pixelated cell fills`() {
+        val tempDir = Files.createTempDirectory("puzzle-progress-pixel")
+
+        try {
+            val store = PuzzleProgressStore(tempDir.toFile())
+            val document = PuzzleDocument(
+                version = 1,
+                imageType = ImageType.Pixelated,
+                bounds = PuzzlePoint(40f, 40f),
+                regions = emptyList(),
+                embeddedPalette = emptyList(),
+                paletteLink = null,
+                pixelGrid = PixelGridDocument(
+                    rows = 2,
+                    cols = 2,
+                    cells = listOf(
+                        PixelCell(id = 1, row = 0, col = 0, targetPaletteId = 1),
+                        PixelCell(id = 2, row = 0, col = 1, targetPaletteId = 2),
+                    ),
+                ),
+                topology = DocumentTopology(
+                    vertices = emptyList(),
+                    edges = emptyList(),
+                    regions = emptyList(),
+                ),
+            )
+
+            store.saveProgress(
+                assetPath = "puzzles/pixel.cbn",
+                fillsByRegionId = mapOf(1 to 1, 2 to 999),
+                totalRegions = 2,
+            )
+
+            val restored = store.loadProgress("puzzles/pixel.cbn", document)
+
+            assertEquals(mapOf(1 to 1), restored)
+        } finally {
+            tempDir.toFile().deleteRecursively()
+        }
+    }
+
+    @Test
     fun `loadProgressSummary returns stored completed and total counts`() {
         val tempDir = Files.createTempDirectory("puzzle-progress-summary")
 
@@ -103,6 +145,7 @@ class PuzzleProgressStoreTest {
     private fun sampleDocument(): PuzzleDocument =
         PuzzleDocument(
             version = 1,
+            imageType = ImageType.Standard,
             bounds = PuzzlePoint(100f, 100f),
             regions = listOf(
                 PuzzleRegion(
@@ -120,6 +163,7 @@ class PuzzleProgressStoreTest {
             ),
             embeddedPalette = emptyList(),
             paletteLink = null,
+            pixelGrid = null,
             topology = DocumentTopology(
                 vertices = emptyList(),
                 edges = emptyList(),

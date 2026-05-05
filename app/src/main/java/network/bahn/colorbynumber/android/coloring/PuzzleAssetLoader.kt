@@ -7,7 +7,11 @@ class PuzzleAssetLoader(
     private val context: Context,
 ) {
     fun load(assetPath: String): LoadedPuzzle {
-        val document = PuzzleJsonParser.parseDocument(readAsset(assetPath))
+        val json = readAsset(assetPath)
+        val document = when (PuzzleJsonParser.parseImageType(json)) {
+            ImageType.Pixelated -> PuzzleJsonParser.parsePixelatedDocument(json)
+            ImageType.Standard -> PuzzleJsonParser.parseDocument(json)
+        }
         val resolvedPalette = resolvePalette(
             assetPath = assetPath,
             embeddedPalette = document.embeddedPalette,

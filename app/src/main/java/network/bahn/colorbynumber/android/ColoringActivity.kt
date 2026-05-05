@@ -201,12 +201,12 @@ private fun ColoringScreen(
             var session by remember(state.puzzleItem.id, state.initialSession) {
                 mutableStateOf(state.initialSession)
             }
-            val totalRegions = state.puzzle.document.regions.size
-            val persistSession = remember(state.puzzleItem.puzzleAssetPath, totalRegions, onSessionPersisted) {
+            val totalFillTargets = state.puzzle.totalFillTargets
+            val persistSession = remember(state.puzzleItem.puzzleAssetPath, totalFillTargets, onSessionPersisted) {
                 { updatedSession: PuzzleSession ->
                     onSessionPersisted(
                         state.puzzleItem.puzzleAssetPath,
-                        totalRegions,
+                        totalFillTargets,
                         updatedSession,
                     )
                 }
@@ -325,7 +325,7 @@ private fun PuzzleContent(
     modifier: Modifier = Modifier,
 ) {
     val paletteById = remember(puzzle.palette) { puzzle.palette.associateBy { it.id } }
-    val totalRegions = puzzle.document.regions.size
+    val totalFillTargets = puzzle.totalFillTargets
     val puzzleAspectRatio = remember(puzzle.worldBounds) {
         (puzzle.worldBounds.width / puzzle.worldBounds.height).takeIf { it > 0f } ?: 1f
     }
@@ -338,7 +338,7 @@ private fun PuzzleContent(
     ) {
         ProgressBadge(
             filledCount = session.filledCount,
-            totalRegions = totalRegions,
+            totalRegions = totalFillTargets,
         )
         Box(
             modifier = Modifier
@@ -352,14 +352,14 @@ private fun PuzzleContent(
                 paletteById = paletteById,
                 onPuzzleTapped = { worldPoint ->
                     val selectedPaletteId = session.selectedPaletteId ?: return@PuzzleCanvas
-                    val hitRegion = PuzzleTopology.hitTestRegion(puzzle.renderRegions, worldPoint) ?: return@PuzzleCanvas
-                    if (session.fillsByRegionId.containsKey(hitRegion.region.id)) return@PuzzleCanvas
-                    val targetPaletteId = hitRegion.region.targetPaletteId ?: return@PuzzleCanvas
+                    val hitResult = resolveFillTarget(puzzle, worldPoint) ?: return@PuzzleCanvas
+                    if (session.fillsByRegionId.containsKey(hitResult.id)) return@PuzzleCanvas
+                    val targetPaletteId = hitResult.targetPaletteId ?: return@PuzzleCanvas
 
                     if (targetPaletteId == selectedPaletteId) {
                         val updatedSession = session.copy(
-                            fillsByRegionId = session.fillsByRegionId + (hitRegion.region.id to selectedPaletteId),
-                            fillHistory = session.fillHistory + hitRegion.region.id,
+                            fillsByRegionId = session.fillsByRegionId + (hitResult.id to selectedPaletteId),
+                            fillHistory = session.fillHistory + hitResult.id,
                         )
                         onSessionChanged(updatedSession)
                         onSessionPersisted(updatedSession)
@@ -497,40 +497,67 @@ private fun PuzzleCanvas(
 
         val currentTransform = transform ?: return@Canvas
 
-        puzzle.renderRegions.forEach { renderRegion ->
-            val path = shapePath(renderRegion.shape, currentTransform)
-            val appliedFill = session.fillsByRegionId[renderRegion.region.id]
-            val showSelectedPreview = appliedFill == null &&
-                renderRegion.region.targetPaletteId != null &&
-                renderRegion.region.targetPaletteId == session.selectedPaletteId
-
-            if (showSelectedPreview) {
-                drawCheckerboardPreview(path)
-            } else {
-                val fillColor = appliedFill
-                    ?.let { paletteById[it]?.composeColor }
-                    ?: Color(0xFFF7F7F7)
-                drawPath(
-                    path = path,
-                    color = fillColor,
-                )
-            }
-        }
-
-        puzzle.renderRegions.forEach { renderRegion ->
-            drawCenteredText(
-                text = renderRegion.region.number.toString(),
-                point = currentTransform.toScreen(renderRegion.region.numberPosition),
+        if (puzzle.isPixelated) {
+            drawPixelatedPuzzle(
+                puzzle = puzzle,
+                session = session,
+                paletteById = paletteById,
+                transform = currentTransform,
                 paint = textPaint,
                 textSize = numberTextSize,
             )
-        }
+        } else {
+            puzzle.renderRegions.forEach { renderRegion ->
+                val path = shapePath(renderRegion.shape, currentTransform)
+                val appliedFill = session.fillsByRegionId[renderRegion.region.id]
+                val showSelectedPreview = appliedFill == null &&
+                    renderRegion.region.targetPaletteId != null &&
+                    renderRegion.region.targetPaletteId == session.selectedPaletteId
 
-        puzzle.outlineSegments.forEach { segment ->
-            drawOutline(segment, currentTransform)
+                if (showSelectedPreview) {
+                    drawCheckerboardPreview(path)
+                } else {
+                    val fillColor = appliedFill
+                        ?.let { paletteById[it]?.composeColor }
+                        ?: Color(0xFFF7F7F7)
+                    drawPath(
+                        path = path,
+                        color = fillColor,
+                    )
+                }
+            }
+
+            puzzle.renderRegions.forEach { renderRegion ->
+                drawCenteredText(
+                    text = renderRegion.region.number.toString(),
+                    point = currentTransform.toScreen(renderRegion.region.numberPosition),
+                    paint = textPaint,
+                    textSize = numberTextSize,
+                )
+            }
+
+            puzzle.outlineSegments.forEach { segment ->
+                drawOutline(segment, currentTransform)
+            }
         }
     }
 }
+
+private data class FillTarget(
+    val id: Int,
+    val targetPaletteId: Int?,
+)
+
+private fun resolveFillTarget(puzzle: LoadedPuzzle, worldPoint: PuzzlePoint): FillTarget? =
+    if (puzzle.isPixelated) {
+        PuzzleTopology.hitTestCell(puzzle.document, worldPoint)?.let { cell ->
+            FillTarget(id = cell.id, targetPaletteId = cell.targetPaletteId)
+        }
+    } else {
+        PuzzleTopology.hitTestRegion(puzzle.renderRegions, worldPoint)?.let { region ->
+            FillTarget(id = region.region.id, targetPaletteId = region.region.targetPaletteId)
+        }
+    }
 
 private fun DrawScope.drawCenteredText(
     text: String,
@@ -551,6 +578,65 @@ private fun DrawScope.drawOutline(segment: OutlineSegment, transform: ScreenTran
         strokeWidth = 2.dp.toPx(),
         cap = StrokeCap.Round,
     )
+}
+
+private fun DrawScope.drawPixelatedPuzzle(
+    puzzle: LoadedPuzzle,
+    session: PuzzleSession,
+    paletteById: Map<Int, PaletteColor>,
+    transform: ScreenTransform,
+    paint: Paint,
+    textSize: TextUnit,
+) {
+    val grid = puzzle.document.pixelGrid ?: return
+    val paletteNumbers = puzzle.palette.mapIndexed { index, color -> color.id to index + 1 }.toMap()
+    val cellWidth = puzzle.document.bounds.x / grid.cols.coerceAtLeast(1)
+    val cellHeight = puzzle.document.bounds.y / grid.rows.coerceAtLeast(1)
+
+    grid.cells.forEach { cell ->
+        val left = cell.col * cellWidth
+        val top = cell.row * cellHeight
+        val screenTopLeft = transform.toScreen(PuzzlePoint(left, top))
+        val screenBottomRight = transform.toScreen(PuzzlePoint(left + cellWidth, top + cellHeight))
+        val cellSize = Size(
+            width = screenBottomRight.x - screenTopLeft.x,
+            height = screenBottomRight.y - screenTopLeft.y,
+        )
+        val cellTopLeft = screenTopLeft
+        val appliedFill = session.fillsByRegionId[cell.id]
+        val showSelectedPreview = appliedFill == null &&
+            cell.targetPaletteId != null &&
+            cell.targetPaletteId == session.selectedPaletteId
+
+        if (showSelectedPreview) {
+            drawRect(
+                color = Color.White,
+                topLeft = cellTopLeft,
+                size = cellSize,
+            )
+            drawCheckerboardPreviewRect(cellTopLeft, cellSize)
+        } else {
+            val fillColor = appliedFill
+                ?.let { paletteById[it]?.composeColor }
+                ?: Color(0xFFF7F7F7)
+            drawRect(
+                color = fillColor,
+                topLeft = cellTopLeft,
+                size = cellSize,
+            )
+        }
+
+        val displayNumber = cell.targetPaletteId?.let { paletteNumbers[it] } ?: 0
+        drawCenteredText(
+            text = displayNumber.toString(),
+            point = Offset(
+                x = cellTopLeft.x + (cellSize.width / 2f),
+                y = cellTopLeft.y + (cellSize.height / 2f),
+            ),
+            paint = paint,
+            textSize = textSize,
+        )
+    }
 }
 
 private fun DrawScope.drawCheckerboardPreview(path: Path) {
@@ -579,6 +665,39 @@ private fun DrawScope.drawCheckerboardPreview(path: Path) {
                     size = Size(CHECKER_TILE_SIZE_PX, CHECKER_TILE_SIZE_PX),
                 )
             }
+        }
+    }
+}
+
+private fun DrawScope.drawCheckerboardPreviewRect(
+    topLeft: Offset,
+    size: Size,
+) {
+    val bounds = androidx.compose.ui.geometry.Rect(topLeft, size)
+    val startColumn = (bounds.left / CHECKER_TILE_SIZE_PX).toInt() - 1
+    val endColumn = (bounds.right / CHECKER_TILE_SIZE_PX).toInt() + 1
+    val startRow = (bounds.top / CHECKER_TILE_SIZE_PX).toInt() - 1
+    val endRow = (bounds.bottom / CHECKER_TILE_SIZE_PX).toInt() + 1
+
+    for (row in startRow..endRow) {
+        for (column in startColumn..endColumn) {
+            if ((row + column) % 2 == 0) {
+                continue
+            }
+            val tileLeft = column * CHECKER_TILE_SIZE_PX
+            val tileTop = row * CHECKER_TILE_SIZE_PX
+            val clippedLeft = maxOf(tileLeft, bounds.left)
+            val clippedTop = maxOf(tileTop, bounds.top)
+            val clippedRight = minOf(tileLeft + CHECKER_TILE_SIZE_PX, bounds.right)
+            val clippedBottom = minOf(tileTop + CHECKER_TILE_SIZE_PX, bounds.bottom)
+            if (clippedRight <= clippedLeft || clippedBottom <= clippedTop) {
+                continue
+            }
+            drawRect(
+                color = CHECKER_DARK_COLOR,
+                topLeft = Offset(clippedLeft, clippedTop),
+                size = Size(clippedRight - clippedLeft, clippedBottom - clippedTop),
+            )
         }
     }
 }
