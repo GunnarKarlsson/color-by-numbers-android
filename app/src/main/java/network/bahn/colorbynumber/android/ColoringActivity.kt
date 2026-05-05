@@ -55,6 +55,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.PathFillType
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.clipPath
 import androidx.compose.ui.graphics.nativeCanvas
@@ -433,6 +434,7 @@ private fun PuzzleCanvas(
 ) {
     val density = LocalDensity.current
     val numberTextSize = 14.sp
+    val pixelNumberTextSize = 8.sp
     val canvasPaddingPx = with(density) { 2.dp.toPx() }
     val currentOnPuzzleTapped by rememberUpdatedState(onPuzzleTapped)
     var canvasSize by remember { mutableStateOf(IntSize.Zero) }
@@ -504,7 +506,7 @@ private fun PuzzleCanvas(
                 paletteById = paletteById,
                 transform = currentTransform,
                 paint = textPaint,
-                textSize = numberTextSize,
+                textSize = pixelNumberTextSize,
             )
         } else {
             puzzle.renderRegions.forEach { renderRegion ->
@@ -564,8 +566,10 @@ private fun DrawScope.drawCenteredText(
     point: Offset,
     paint: Paint,
     textSize: TextUnit,
+    color: Color = Color.Black,
 ) {
     paint.textSize = textSize.toPx()
+    paint.color = color.toArgb()
     val baseline = point.y - (paint.descent() + paint.ascent()) / 2f
     drawContext.canvas.nativeCanvas.drawText(text, point.x, baseline, paint)
 }
@@ -592,6 +596,7 @@ private fun DrawScope.drawPixelatedPuzzle(
     val paletteNumbers = puzzle.palette.mapIndexed { index, color -> color.id to index + 1 }.toMap()
     val cellWidth = puzzle.document.bounds.x / grid.cols.coerceAtLeast(1)
     val cellHeight = puzzle.document.bounds.y / grid.rows.coerceAtLeast(1)
+    val gridStrokeWidth = 1.dp.toPx()
 
     grid.cells.forEach { cell ->
         val left = cell.col * cellWidth
@@ -635,6 +640,26 @@ private fun DrawScope.drawPixelatedPuzzle(
             ),
             paint = paint,
             textSize = textSize,
+            color = PIXEL_DIGIT_COLOR,
+        )
+    }
+
+    for (row in 0..grid.rows) {
+        val y = row * cellHeight
+        drawLine(
+            color = PIXEL_GRID_COLOR,
+            start = transform.toScreen(PuzzlePoint(0f, y)),
+            end = transform.toScreen(PuzzlePoint(puzzle.document.bounds.x, y)),
+            strokeWidth = gridStrokeWidth,
+        )
+    }
+    for (col in 0..grid.cols) {
+        val x = col * cellWidth
+        drawLine(
+            color = PIXEL_GRID_COLOR,
+            start = transform.toScreen(PuzzlePoint(x, 0f)),
+            end = transform.toScreen(PuzzlePoint(x, puzzle.document.bounds.y)),
+            strokeWidth = gridStrokeWidth,
         )
     }
 }
@@ -833,3 +858,5 @@ private const val MIN_ZOOM = 1f
 private const val MAX_ZOOM = 6f
 private const val CHECKER_TILE_SIZE_PX = 16f
 private val CHECKER_DARK_COLOR = Color(0xFFD2D2D2)
+private val PIXEL_GRID_COLOR = Color(0xFFD9D9D9)
+private val PIXEL_DIGIT_COLOR = Color(0xFFBDBDBD)
