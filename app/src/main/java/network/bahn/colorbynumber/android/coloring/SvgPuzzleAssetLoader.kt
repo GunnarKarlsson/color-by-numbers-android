@@ -96,6 +96,12 @@ data class SvgRegion(
     val isPlayable: Boolean,
 )
 
+private data class AnalyzedSvgPuzzle(
+    val palette: List<PaletteColor>,
+    val regionLabels: IntArray,
+    val regions: List<SvgRegion>,
+)
+
 class SvgPuzzleAssetLoader(
     private val context: Context,
 ) {
@@ -103,121 +109,24 @@ class SvgPuzzleAssetLoader(
         val resolvedPaths = resolvePaths(assetPath)
         val colorsSvg = readText(resolvedPaths.colorsAssetPath)
         val linesSvg = readText(resolvedPaths.linesAssetPath)
+        val sanitizedColorsSvg = stripGroupById(colorsSvg, "vector-lines") ?: colorsSvg
 
         val lineBitmap = renderSvgBitmap(linesSvg, backgroundColor = null)
-        val gameplayBitmap = renderSvgBitmap(colorsSvg, backgroundColor = null)
-        val candidateColors = extractDeclaredPalette(colorsSvg)
-        val includedColors = filterPaletteByRenderedArea(
-            candidates = candidateColors,
+        val gameplayBitmap = renderSvgBitmap(sanitizedColorsSvg, backgroundColor = null)
+        val analyzedPuzzle = analyzeSvgPuzzle(
             renderedBitmap = gameplayBitmap,
-            minPixels = DEFAULT_MIN_PALETTE_PIXELS,
+            paletteCandidates = extractDeclaredPalette(sanitizedColorsSvg),
+            minRegionPixels = DEFAULT_MIN_PALETTE_PIXELS,
         )
-
-        val palette = includedColors.mapIndexed { index, argb ->
-            PaletteColor(
-                id = index + 1,
-                label = toHex(argb),
-                rgba = intArrayOf(
-                    Color.red(argb),
-                    Color.green(argb),
-                    Color.blue(argb),
-                    Color.alpha(argb),
-                ),
-            )
-        }
-        val paletteIdByColor = palette.associate { paletteColor ->
-            rgbaToColorInt(paletteColor.rgba) to paletteColor.id
-        }
-
-        val regions = mutableListOf<SvgRegion>()
-        val pixels = IntArray(gameplayBitmap.width * gameplayBitmap.height).also {
-            gameplayBitmap.getPixels(
-                it,
-                0,
-                gameplayBitmap.width,
-                0,
-                0,
-                gameplayBitmap.width,
-                gameplayBitmap.height,
-            )
-        }
-        val regionLabels = IntArray(pixels.size) { NO_REGION_ID }
-        val stack = ArrayDeque<Int>()
-
-        for (index in pixels.indices) {
-            if (regionLabels[index] != NO_REGION_ID || Color.alpha(pixels[index]) == 0) {
-                continue
-            }
-
-            val targetColor = pixels[index]
-            val regionId = regions.size
-            regionLabels[index] = regionId
-            stack.addLast(index)
-
-            while (stack.isNotEmpty()) {
-                val current = stack.removeLast()
-                val x = current % gameplayBitmap.width
-                val y = current / gameplayBitmap.width
-
-                if (x > 0) {
-                    maybeQueueNeighbor(
-                        neighborIndex = current - 1,
-                        expectedColor = targetColor,
-                        pixels = pixels,
-                        regionLabels = regionLabels,
-                        regionId = regionId,
-                        stack = stack,
-                    )
-                }
-                if (x + 1 < gameplayBitmap.width) {
-                    maybeQueueNeighbor(
-                        neighborIndex = current + 1,
-                        expectedColor = targetColor,
-                        pixels = pixels,
-                        regionLabels = regionLabels,
-                        regionId = regionId,
-                        stack = stack,
-                    )
-                }
-                if (y > 0) {
-                    maybeQueueNeighbor(
-                        neighborIndex = current - gameplayBitmap.width,
-                        expectedColor = targetColor,
-                        pixels = pixels,
-                        regionLabels = regionLabels,
-                        regionId = regionId,
-                        stack = stack,
-                    )
-                }
-                if (y + 1 < gameplayBitmap.height) {
-                    maybeQueueNeighbor(
-                        neighborIndex = current + gameplayBitmap.width,
-                        expectedColor = targetColor,
-                        pixels = pixels,
-                        regionLabels = regionLabels,
-                        regionId = regionId,
-                        stack = stack,
-                    )
-                }
-            }
-
-            val targetPaletteId = paletteIdByColor[targetColor]
-            regions += SvgRegion(
-                id = regionId,
-                targetColor = targetColor,
-                targetPaletteId = targetPaletteId,
-                isPlayable = targetPaletteId != null,
-            )
-        }
 
         return SvgPuzzle(
             assetPath = assetPath,
             width = gameplayBitmap.width,
             height = gameplayBitmap.height,
             lineBitmap = lineBitmap,
-            palette = palette,
-            regionLabels = regionLabels,
-            regions = regions,
+            palette = analyzedPuzzle.palette,
+            regionLabels = analyzedPuzzle.regionLabels,
+            regions = analyzedPuzzle.regions,
         )
     }
 
@@ -227,8 +136,11 @@ class SvgPuzzleAssetLoader(
             return loadBitmapAsset(previewAssetPath)
         }
 
+        val colorsSvg = readText(resolvedPaths.colorsAssetPath)
+        val sanitizedColorsSvg = stripGroupById(colorsSvg, "vector-lines") ?: colorsSvg
+
         val colorsBitmap = renderSvgBitmap(
-            readText(resolvedPaths.colorsAssetPath),
+            sanitizedColorsSvg,
             backgroundColor = Color.WHITE,
         )
         val linesBitmap = renderSvgBitmap(
@@ -337,6 +249,53 @@ private fun maybeQueueNeighbor(
     stack.addLast(neighborIndex)
 }
 
+private fun stripGroupById(svg: String, groupId: String): String? {
+    val marker = "id=\"$groupId\""
+    val idIndex = svg.indexOf(marker)
+    if (idIndex == -1) {
+        return null
+    }
+
+    val groupStart = svg.lastIndexOf("<g", startIndex = idIndex)
+    if (groupStart == -1) {
+        return null
+    }
+
+    val startTagRelativeEnd = svg.substring(groupStart).indexOf('>')
+    if (startTagRelativeEnd == -1) {
+        return null
+    }
+
+    val startTagEnd = groupStart + startTagRelativeEnd + 1
+    var depth = 1
+    var cursor = startTagEnd
+
+    while (cursor < svg.length) {
+        val nextOpen = svg.indexOf("<g", startIndex = cursor).takeIf { it >= 0 }
+        val nextClose = svg.indexOf("</g>", startIndex = cursor).takeIf { it >= 0 }
+
+        when {
+            nextOpen != null && nextClose != null && nextOpen < nextClose -> {
+                depth += 1
+                cursor = nextOpen + 2
+            }
+            nextClose != null -> {
+                depth -= 1
+                cursor = nextClose + 4
+                if (depth == 0) {
+                    return buildString(svg.length) {
+                        append(svg, 0, groupStart)
+                        append(svg, cursor, svg.length)
+                    }
+                }
+            }
+            else -> return null
+        }
+    }
+
+    return null
+}
+
 private fun extractDeclaredPalette(svg: String): List<Int> {
     val colors = sortedSetOf<Int>()
     extractPaintColorStrings(svg).forEach { colorString ->
@@ -345,11 +304,11 @@ private fun extractDeclaredPalette(svg: String): List<Int> {
     return colors.toList()
 }
 
-private fun filterPaletteByRenderedArea(
-    candidates: List<Int>,
+private fun analyzeSvgPuzzle(
     renderedBitmap: Bitmap,
-    minPixels: Int,
-): List<Int> {
+    paletteCandidates: List<Int>,
+    minRegionPixels: Int,
+): AnalyzedSvgPuzzle {
     val pixels = IntArray(renderedBitmap.width * renderedBitmap.height).also {
         renderedBitmap.getPixels(
             it,
@@ -361,14 +320,113 @@ private fun filterPaletteByRenderedArea(
             renderedBitmap.height,
         )
     }
-    val counts = mutableMapOf<Int, Int>()
-    for (color in pixels) {
-        if (Color.alpha(color) == 0) {
+    val regionLabels = IntArray(pixels.size) { NO_REGION_ID }
+    val declaredPalette = paletteCandidates.toSet()
+    val playableRegionCounts = linkedMapOf<Int, Int>()
+    val regions = mutableListOf<SvgRegion>()
+    val stack = ArrayDeque<Int>()
+
+    for (index in pixels.indices) {
+        if (regionLabels[index] != NO_REGION_ID || Color.alpha(pixels[index]) == 0) {
             continue
         }
-        counts[color] = (counts[color] ?: 0) + 1
+
+        val targetColor = pixels[index]
+        val regionId = regions.size
+        regionLabels[index] = regionId
+        stack.addLast(index)
+        var regionPixelCount = 0
+
+        while (stack.isNotEmpty()) {
+            val current = stack.removeLast()
+            regionPixelCount += 1
+            val x = current % renderedBitmap.width
+            val y = current / renderedBitmap.width
+
+            if (x > 0) {
+                maybeQueueNeighbor(
+                    neighborIndex = current - 1,
+                    expectedColor = targetColor,
+                    pixels = pixels,
+                    regionLabels = regionLabels,
+                    regionId = regionId,
+                    stack = stack,
+                )
+            }
+            if (x + 1 < renderedBitmap.width) {
+                maybeQueueNeighbor(
+                    neighborIndex = current + 1,
+                    expectedColor = targetColor,
+                    pixels = pixels,
+                    regionLabels = regionLabels,
+                    regionId = regionId,
+                    stack = stack,
+                )
+            }
+            if (y > 0) {
+                maybeQueueNeighbor(
+                    neighborIndex = current - renderedBitmap.width,
+                    expectedColor = targetColor,
+                    pixels = pixels,
+                    regionLabels = regionLabels,
+                    regionId = regionId,
+                    stack = stack,
+                )
+            }
+            if (y + 1 < renderedBitmap.height) {
+                maybeQueueNeighbor(
+                    neighborIndex = current + renderedBitmap.width,
+                    expectedColor = targetColor,
+                    pixels = pixels,
+                    regionLabels = regionLabels,
+                    regionId = regionId,
+                    stack = stack,
+                )
+            }
+        }
+
+        val isPlayable = declaredPalette.contains(targetColor) && regionPixelCount >= minRegionPixels
+        if (isPlayable) {
+            playableRegionCounts[targetColor] = (playableRegionCounts[targetColor] ?: 0) + 1
+        }
+        regions += SvgRegion(
+            id = regionId,
+            targetColor = targetColor,
+            targetPaletteId = null,
+            isPlayable = isPlayable,
+        )
     }
-    return candidates.filter { candidate -> (counts[candidate] ?: 0) >= minPixels }
+
+    val palette = paletteCandidates
+        .filter { playableRegionCounts.containsKey(it) }
+        .mapIndexed { index, argb ->
+            PaletteColor(
+                id = index + 1,
+                label = toHex(argb),
+                rgba = intArrayOf(
+                    Color.red(argb),
+                    Color.green(argb),
+                    Color.blue(argb),
+                    Color.alpha(argb),
+                ),
+            )
+        }
+    val paletteIdByColor = palette.associate { paletteColor ->
+        rgbaToColorInt(paletteColor.rgba) to paletteColor.id
+    }
+    val updatedRegions = regions.map { region ->
+        if (!region.isPlayable) {
+            region
+        } else {
+            region.copy(targetPaletteId = paletteIdByColor[region.targetColor])
+        }
+    }
+
+    return AnalyzedSvgPuzzle(
+        palette = palette,
+        regionLabels = regionLabels,
+        regions = updatedRegions,
+    )
 }
 
 private fun extractPaintColorStrings(svg: String): List<String> {
