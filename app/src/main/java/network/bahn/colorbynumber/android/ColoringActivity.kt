@@ -644,20 +644,16 @@ private fun renderLineOverlayBitmap(
         Bitmap.Config.ARGB_8888,
     )
     val canvas = android.graphics.Canvas(bitmap)
-
-    val sourceWidth = puzzle.lineSvgWidth.coerceAtLeast(1)
-    val sourceHeight = puzzle.lineSvgHeight.coerceAtLeast(1)
-    val overlayScaleX = puzzle.width.toFloat() / sourceWidth.toFloat()
-    val overlayScaleY = puzzle.height.toFloat() / sourceHeight.toFloat()
-
-    canvas.save()
-    canvas.translate(transform.offsetX, transform.offsetY)
-    canvas.scale(
-        transform.scale * overlayScaleX,
-        transform.scale * overlayScaleY,
+    val topLeft = transform.toScreen(PuzzlePoint(0f, 0f))
+    val bottomRight = transform.toScreen(PuzzlePoint(puzzle.width.toFloat(), puzzle.height.toFloat()))
+    val destination = android.graphics.RectF(
+        topLeft.x,
+        topLeft.y,
+        bottomRight.x,
+        bottomRight.y,
     )
-    puzzle.lineSvg.renderToCanvas(canvas)
-    canvas.restore()
+
+    puzzle.lineSvg.renderToCanvas(canvas, destination)
 
     return bitmap
 }
