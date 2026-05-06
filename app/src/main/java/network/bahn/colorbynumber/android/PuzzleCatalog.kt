@@ -7,8 +7,7 @@ import com.google.gson.GsonBuilder
 data class PuzzleListItem(
     val id: String,
     val displayName: String,
-    val puzzleAssetPath: String,
-    val previewAssetPath: String,
+    val assetPath: String,
 )
 
 object PuzzleCatalog {

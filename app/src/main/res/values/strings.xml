@@ -1,6 +1,7 @@
 <resources>
     <string name="app_name">ColorByNumber</string>
     <string name="image_grid_title">Choose a puzzle</string>
+    <string name="image_grid_ready">Tap to color</string>
     <string name="image_grid_progress">%1$d/%2$d filled</string>
     <string name="image_grid_progress_loading">Loading progress…</string>
     <string name="coloring_title">Coloring</string>
@@ -8,6 +9,7 @@
     <string name="palette_title">Palette</string>
     <string name="coloring_load_failed">Failed to load the sample puzzle.</string>
     <string name="coloring_progress">Progress: %1$d/%2$d regions filled</string>
+    <string name="coloring_selected_color_progress">Selected color: %1$d/%2$d areas completed</string>
     <string name="coloring_selected_palette">Selected color: %1$d - %2$s</string>
     <string name="coloring_no_palette_selected">Selected color: none</string>
     <string name="coloring_clear_progress">Clear progress</string>

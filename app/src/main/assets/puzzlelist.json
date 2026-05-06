@@ -1,50 +1,12 @@
 [
   {
     "id": "image1",
-    "displayName": "Image 1",
-    "puzzleAssetPath": "puzzles/image1.cbn",
-    "previewAssetPath": "previews/image1_preview.png"
-  },
-  {
-    "id": "image7",
-    "displayName": "Image 7",
-    "puzzleAssetPath": "puzzles/image7.cbn",
-    "previewAssetPath": "previews/image7_preview.png"
-  },
-  {
-    "id": "image8",
-    "displayName": "Image 8",
-    "puzzleAssetPath": "puzzles/image8.cbn",
-    "previewAssetPath": "previews/image8_preview.png"
+    "displayName": "Girl 1",
+    "assetPath": "girl1"
   },
   {
     "id": "image2",
-    "displayName": "Image 2",
-    "puzzleAssetPath": "puzzles/image2.cbn",
-    "previewAssetPath": "previews/image2_preview.png"
-  },
-  {
-    "id": "image3",
-    "displayName": "Image 3",
-    "puzzleAssetPath": "puzzles/image3.cbn",
-    "previewAssetPath": "previews/image3_preview.png"
-  },
-  {
-    "id": "image4",
-    "displayName": "Image 4",
-    "puzzleAssetPath": "puzzles/image4.cbn",
-    "previewAssetPath": "previews/image4_preview.png"
-  },
-  {
-    "id": "image5",
-    "displayName": "Image 5",
-    "puzzleAssetPath": "puzzles/image5.cbn",
-    "previewAssetPath": "previews/image5_preview.png"
-  },
-  {
-    "id": "image6",
-    "displayName": "Dotty Flower",
-    "puzzleAssetPath": "puzzles/image6.cbn",
-    "previewAssetPath": "previews/image6_preview.png"
+    "displayName": "Cat 1",
+    "assetPath": "cat1"
   }
 ]

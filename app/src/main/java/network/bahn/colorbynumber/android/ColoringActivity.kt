@@ -2,7 +2,6 @@ package network.bahn.colorbynumber.android
 
 import android.content.Context
 import android.content.Intent
-import android.graphics.Paint
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -14,7 +13,6 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.horizontalScroll
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -27,6 +25,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.FastRewind
@@ -44,45 +43,31 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Path
-import androidx.compose.ui.graphics.PathFillType
-import androidx.compose.ui.graphics.StrokeCap
-import androidx.compose.ui.graphics.toArgb
-import androidx.compose.ui.graphics.drawscope.DrawScope
-import androidx.compose.ui.graphics.drawscope.clipPath
-import androidx.compose.ui.graphics.nativeCanvas
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.IntSize
-import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.layout.onSizeChanged
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import network.bahn.colorbynumber.android.coloring.LoadedPuzzle
-import network.bahn.colorbynumber.android.coloring.OutlineSegment
+import kotlin.math.roundToInt
 import network.bahn.colorbynumber.android.coloring.PaletteColor
-import network.bahn.colorbynumber.android.coloring.PuzzleAssetLoader
 import network.bahn.colorbynumber.android.coloring.PuzzleBounds
 import network.bahn.colorbynumber.android.coloring.PuzzlePoint
-import network.bahn.colorbynumber.android.coloring.PuzzleProgressStore
 import network.bahn.colorbynumber.android.coloring.PuzzleSession
-import network.bahn.colorbynumber.android.coloring.PuzzleTopology
-import network.bahn.colorbynumber.android.coloring.RenderShape
+import network.bahn.colorbynumber.android.coloring.SvgPuzzle
+import network.bahn.colorbynumber.android.coloring.SvgPuzzleAssetLoader
 import network.bahn.colorbynumber.android.ui.theme.ColorByNumberTheme
 
 class ColoringActivity : ComponentActivity() {
@@ -112,8 +97,7 @@ private sealed interface ColoringUiState {
     data object Loading : ColoringUiState
     data class Success(
         val puzzleItem: PuzzleListItem,
-        val puzzle: LoadedPuzzle,
-        val initialSession: PuzzleSession,
+        val puzzle: SvgPuzzle,
     ) : ColoringUiState
 
     data class Error(val message: String) : ColoringUiState
@@ -124,25 +108,17 @@ private fun ColoringRoute(
     puzzleItem: PuzzleListItem,
     onNavigateBack: () -> Unit,
 ) {
-    val context = LocalContext.current
-    val loader = remember(context) { PuzzleAssetLoader(context) }
-    val progressStore = remember(context) { PuzzleProgressStore(context.filesDir) }
-    val coroutineScope = rememberCoroutineScope()
-    val state by produceState<ColoringUiState>(initialValue = ColoringUiState.Loading, loader, progressStore, puzzleItem) {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val loader = remember(context) { SvgPuzzleAssetLoader(context) }
+    val state by produceState<ColoringUiState>(initialValue = ColoringUiState.Loading, loader, puzzleItem) {
         value = try {
-            val result = withContext(Dispatchers.IO) {
-                val puzzle = loader.load(puzzleItem.puzzleAssetPath)
-                val restoredFills = progressStore.loadProgress(puzzleItem.puzzleAssetPath, puzzle.document)
-                ColoringUiState.Success(
-                    puzzleItem = puzzleItem,
-                    puzzle = puzzle,
-                    initialSession = PuzzleSession(
-                        fillsByRegionId = restoredFills,
-                        fillHistory = restoredFills.keys.toList(),
-                    ),
-                )
+            val puzzle = withContext(Dispatchers.IO) {
+                loader.load(puzzleItem.assetPath)
             }
-            result
+            ColoringUiState.Success(
+                puzzleItem = puzzleItem,
+                puzzle = puzzle,
+            )
         } catch (error: Exception) {
             ColoringUiState.Error(
                 error.message ?: context.getString(R.string.coloring_load_failed),
@@ -153,15 +129,6 @@ private fun ColoringRoute(
     ColoringScreen(
         state = state,
         onNavigateBack = onNavigateBack,
-        onSessionPersisted = { assetPath, totalRegions, session ->
-            coroutineScope.launch(Dispatchers.IO) {
-                progressStore.saveProgress(
-                    assetPath = assetPath,
-                    fillsByRegionId = session.fillsByRegionId,
-                    totalRegions = totalRegions,
-                )
-            }
-        },
     )
 }
 
@@ -170,7 +137,6 @@ private fun ColoringRoute(
 private fun ColoringScreen(
     state: ColoringUiState,
     onNavigateBack: () -> Unit,
-    onSessionPersisted: (String, Int, PuzzleSession) -> Unit,
 ) {
     when (state) {
         ColoringUiState.Loading -> Scaffold(
@@ -199,18 +165,8 @@ private fun ColoringScreen(
         }
 
         is ColoringUiState.Success -> {
-            var session by remember(state.puzzleItem.id, state.initialSession) {
-                mutableStateOf(state.initialSession)
-            }
-            val totalFillTargets = state.puzzle.totalFillTargets
-            val persistSession = remember(state.puzzleItem.puzzleAssetPath, totalFillTargets, onSessionPersisted) {
-                { updatedSession: PuzzleSession ->
-                    onSessionPersisted(
-                        state.puzzleItem.puzzleAssetPath,
-                        totalFillTargets,
-                        updatedSession,
-                    )
-                }
+            var session by remember(state.puzzleItem.id) {
+                mutableStateOf(PuzzleSession())
             }
 
             Scaffold(
@@ -220,15 +176,9 @@ private fun ColoringScreen(
                         onNavigateBack = onNavigateBack,
                         clearEnabled = session.fillHistory.isNotEmpty(),
                         clearAllEnabled = session.fillsByRegionId.isNotEmpty(),
-                        onClear = {
-                            val updatedSession = session.undoLastFill()
-                            session = updatedSession
-                            persistSession(updatedSession)
-                        },
+                        onClear = { session = session.undoLastFill() },
                         onClearAll = {
-                            val clearedSession = PuzzleSession(selectedPaletteId = session.selectedPaletteId)
-                            session = clearedSession
-                            persistSession(clearedSession)
+                            session = PuzzleSession(selectedPaletteId = session.selectedPaletteId)
                         },
                     )
                 },
@@ -237,7 +187,6 @@ private fun ColoringScreen(
                     puzzle = state.puzzle,
                     session = session,
                     onSessionChanged = { session = it },
-                    onSessionPersisted = persistSession,
                     modifier = Modifier.padding(innerPadding),
                 )
             }
@@ -258,7 +207,7 @@ private fun ColoringTopBar(
     TopAppBar(
         navigationIcon = {
             IconButton(onClick = onNavigateBack) {
-                        Icon(
+                Icon(
                     imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                     contentDescription = stringResource(R.string.coloring_back),
                 )
@@ -319,16 +268,19 @@ private fun ErrorState(message: String, modifier: Modifier = Modifier) {
 
 @Composable
 private fun PuzzleContent(
-    puzzle: LoadedPuzzle,
+    puzzle: SvgPuzzle,
     session: PuzzleSession,
     onSessionChanged: (PuzzleSession) -> Unit,
-    onSessionPersisted: (PuzzleSession) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val paletteById = remember(puzzle.palette) { puzzle.palette.associateBy { it.id } }
-    val totalFillTargets = puzzle.totalFillTargets
     val puzzleAspectRatio = remember(puzzle.worldBounds) {
         (puzzle.worldBounds.width / puzzle.worldBounds.height).takeIf { it > 0f } ?: 1f
+    }
+    val overallProgress = remember(session, puzzle) {
+        puzzle.overallProgress(session)
+    }
+    val selectedProgress = remember(session, puzzle) {
+        puzzle.selectedColorProgress(session)
     }
 
     Column(
@@ -337,60 +289,79 @@ private fun PuzzleContent(
             .padding(horizontal = 16.dp, vertical = 8.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        ProgressBadge(
-            filledCount = session.filledCount,
-            totalRegions = totalFillTargets,
-        )
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            ProgressBadge(
+                filledCount = overallProgress.first,
+                totalRegions = overallProgress.second,
+            )
+            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text(
+                    text = stringResource(
+                        R.string.coloring_progress,
+                        overallProgress.first,
+                        overallProgress.second,
+                    ),
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.SemiBold,
+                )
+                Text(
+                    text = selectedProgress?.let { (completed, total) ->
+                        stringResource(R.string.coloring_selected_color_progress, completed, total)
+                    } ?: stringResource(R.string.coloring_no_palette_selected),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+
         Box(
             modifier = Modifier
                 .fillMaxWidth()
                 .weight(1f),
             contentAlignment = Alignment.Center,
         ) {
-            PuzzleCanvas(
+            SvgPuzzleCanvas(
                 puzzle = puzzle,
                 session = session,
-                paletteById = paletteById,
                 onPuzzleTapped = { worldPoint ->
-                    val selectedPaletteId = session.selectedPaletteId ?: return@PuzzleCanvas
-                    val hitResult = resolveFillTarget(puzzle, worldPoint) ?: return@PuzzleCanvas
-                    if (session.fillsByRegionId.containsKey(hitResult.id)) return@PuzzleCanvas
-                    val targetPaletteId = hitResult.targetPaletteId ?: return@PuzzleCanvas
-
-                    if (targetPaletteId == selectedPaletteId) {
-                        val updatedSession = session.copy(
-                            fillsByRegionId = session.fillsByRegionId + (hitResult.id to selectedPaletteId),
-                            fillHistory = session.fillHistory + hitResult.id,
-                        )
-                        onSessionChanged(updatedSession)
-                        onSessionPersisted(updatedSession)
+                    val selectedPaletteId = session.selectedPaletteId ?: return@SvgPuzzleCanvas
+                    val x = worldPoint.x.toInt()
+                    val y = worldPoint.y.toInt()
+                    val region = puzzle.regionAt(x, y) ?: return@SvgPuzzleCanvas
+                    if (!region.isPlayable || region.targetPaletteId != selectedPaletteId) {
+                        return@SvgPuzzleCanvas
                     }
+                    if (session.fillsByRegionId.containsKey(region.id)) {
+                        return@SvgPuzzleCanvas
+                    }
+
+                    onSessionChanged(
+                        session.copy(
+                            fillsByRegionId = session.fillsByRegionId + (region.id to selectedPaletteId),
+                            fillHistory = session.fillHistory + region.id,
+                        ),
+                    )
                 },
                 modifier = Modifier
                     .fillMaxWidth()
                     .aspectRatio(puzzleAspectRatio),
             )
         }
+
         PaletteStrip(
             colors = puzzle.palette,
             selectedPaletteId = session.selectedPaletteId,
             onPaletteSelected = { paletteId ->
-                onSessionChanged(session.copy(selectedPaletteId = paletteId))
-            },
-        )
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(56.dp)
-                .border(
-                    width = 1.dp,
-                    color = MaterialTheme.colorScheme.outlineVariant,
-                    shape = MaterialTheme.shapes.small,
+                onSessionChanged(
+                    session.copy(
+                        selectedPaletteId = if (session.selectedPaletteId == paletteId) null else paletteId,
+                    ),
                 )
-                .background(
-                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
-                    shape = MaterialTheme.shapes.small,
-                ),
+            },
         )
     }
 }
@@ -425,20 +396,22 @@ private fun ProgressBadge(
 }
 
 @Composable
-private fun PuzzleCanvas(
-    puzzle: LoadedPuzzle,
+private fun SvgPuzzleCanvas(
+    puzzle: SvgPuzzle,
     session: PuzzleSession,
-    paletteById: Map<Int, PaletteColor>,
     onPuzzleTapped: (PuzzlePoint) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val density = LocalDensity.current
-    val numberTextSize = 14.sp
-    val pixelNumberTextSize = 8.sp
-    val canvasPaddingPx = with(density) { 2.dp.toPx() }
     val currentOnPuzzleTapped by rememberUpdatedState(onPuzzleTapped)
     var canvasSize by remember { mutableStateOf(IntSize.Zero) }
     var viewport by remember(puzzle) { mutableStateOf(PuzzleViewport()) }
+    val displayBitmap by produceState<android.graphics.Bitmap?>(initialValue = null, puzzle, session) {
+        value = withContext(Dispatchers.Default) {
+            puzzle.composeDisplayBitmap(session)
+        }
+    }
+
+    val canvasPaddingPx = with(androidx.compose.ui.platform.LocalDensity.current) { 2.dp.toPx() }
     val baseTransform = remember(canvasSize, puzzle.worldBounds, canvasPaddingPx) {
         if (canvasSize == IntSize.Zero) {
             null
@@ -452,14 +425,6 @@ private fun PuzzleCanvas(
     }
     val transform = remember(baseTransform, viewport) {
         baseTransform?.applyViewport(viewport)
-    }
-    val textPaint = remember(density) {
-        Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = android.graphics.Color.BLACK
-            textAlign = Paint.Align.CENTER
-            textSize = with(density) { numberTextSize.toPx() }
-            typeface = android.graphics.Typeface.create(android.graphics.Typeface.DEFAULT, android.graphics.Typeface.BOLD)
-        }
     }
 
     Canvas(
@@ -488,7 +453,7 @@ private fun PuzzleCanvas(
                     )
                 }
             }
-            .pointerInput(transform, puzzle.renderRegions) {
+            .pointerInput(transform, puzzle) {
                 detectTapGestures { offset ->
                     val currentTransform = transform ?: return@detectTapGestures
                     currentOnPuzzleTapped(currentTransform.toWorld(offset))
@@ -496,259 +461,45 @@ private fun PuzzleCanvas(
             },
     ) {
         drawRect(color = Color.White)
-
         val currentTransform = transform ?: return@Canvas
+        val imageBitmap = displayBitmap ?: return@Canvas
 
-        if (puzzle.isPixelated) {
-            drawPixelatedPuzzle(
-                puzzle = puzzle,
-                session = session,
-                paletteById = paletteById,
-                transform = currentTransform,
-                paint = textPaint,
-                textSize = pixelNumberTextSize,
-            )
-        } else {
-            puzzle.renderRegions.forEach { renderRegion ->
-                val path = shapePath(renderRegion.shape, currentTransform)
-                val appliedFill = session.fillsByRegionId[renderRegion.region.id]
-                val showSelectedPreview = appliedFill == null &&
-                    renderRegion.region.targetPaletteId != null &&
-                    renderRegion.region.targetPaletteId == session.selectedPaletteId
-
-                if (showSelectedPreview) {
-                    drawCheckerboardPreview(path)
-                } else {
-                    val fillColor = appliedFill
-                        ?.let { paletteById[it]?.composeColor }
-                        ?: Color(0xFFF7F7F7)
-                    drawPath(
-                        path = path,
-                        color = fillColor,
-                    )
-                }
-            }
-
-            puzzle.renderRegions.forEach { renderRegion ->
-                drawCenteredText(
-                    text = renderRegion.region.number.toString(),
-                    point = currentTransform.toScreen(renderRegion.region.numberPosition),
-                    paint = textPaint,
-                    textSize = numberTextSize,
-                )
-            }
-
-            puzzle.outlineSegments.forEach { segment ->
-                drawOutline(segment, currentTransform)
-            }
-        }
+        drawBitmapToBounds(
+            bitmap = imageBitmap,
+            transform = currentTransform,
+            puzzleWidth = puzzle.width,
+            puzzleHeight = puzzle.height,
+        )
+        drawBitmapToBounds(
+            bitmap = puzzle.lineBitmap,
+            transform = currentTransform,
+            puzzleWidth = puzzle.width,
+            puzzleHeight = puzzle.height,
+        )
     }
 }
 
-private data class FillTarget(
-    val id: Int,
-    val targetPaletteId: Int?,
-)
-
-private fun resolveFillTarget(puzzle: LoadedPuzzle, worldPoint: PuzzlePoint): FillTarget? =
-    if (puzzle.isPixelated) {
-        PuzzleTopology.hitTestCell(puzzle.document, worldPoint)?.let { cell ->
-            FillTarget(id = cell.id, targetPaletteId = cell.targetPaletteId)
-        }
-    } else {
-        PuzzleTopology.hitTestRegion(puzzle.renderRegions, worldPoint)?.let { region ->
-            FillTarget(id = region.region.id, targetPaletteId = region.region.targetPaletteId)
-        }
-    }
-
-private fun DrawScope.drawCenteredText(
-    text: String,
-    point: Offset,
-    paint: Paint,
-    textSize: TextUnit,
-    color: Color = Color.Black,
-) {
-    paint.textSize = textSize.toPx()
-    paint.color = color.toArgb()
-    val baseline = point.y - (paint.descent() + paint.ascent()) / 2f
-    drawContext.canvas.nativeCanvas.drawText(text, point.x, baseline, paint)
-}
-
-private fun DrawScope.drawOutline(segment: OutlineSegment, transform: ScreenTransform) {
-    drawLine(
-        color = Color.Black,
-        start = transform.toScreen(segment.start),
-        end = transform.toScreen(segment.end),
-        strokeWidth = 2.dp.toPx(),
-        cap = StrokeCap.Round,
-    )
-}
-
-private fun DrawScope.drawPixelatedPuzzle(
-    puzzle: LoadedPuzzle,
-    session: PuzzleSession,
-    paletteById: Map<Int, PaletteColor>,
+private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawBitmapToBounds(
+    bitmap: android.graphics.Bitmap,
     transform: ScreenTransform,
-    paint: Paint,
-    textSize: TextUnit,
+    puzzleWidth: Int,
+    puzzleHeight: Int,
 ) {
-    val grid = puzzle.document.pixelGrid ?: return
-    val paletteNumbers = puzzle.palette.mapIndexed { index, color -> color.id to index + 1 }.toMap()
-    val cellWidth = puzzle.document.bounds.x / grid.cols.coerceAtLeast(1)
-    val cellHeight = puzzle.document.bounds.y / grid.rows.coerceAtLeast(1)
-    val gridStrokeWidth = 1.dp.toPx()
-
-    grid.cells.forEach { cell ->
-        val left = cell.col * cellWidth
-        val top = cell.row * cellHeight
-        val screenTopLeft = transform.toScreen(PuzzlePoint(left, top))
-        val screenBottomRight = transform.toScreen(PuzzlePoint(left + cellWidth, top + cellHeight))
-        val cellSize = Size(
-            width = screenBottomRight.x - screenTopLeft.x,
-            height = screenBottomRight.y - screenTopLeft.y,
-        )
-        val cellTopLeft = screenTopLeft
-        val appliedFill = session.fillsByRegionId[cell.id]
-        val showSelectedPreview = appliedFill == null &&
-            cell.targetPaletteId != null &&
-            cell.targetPaletteId == session.selectedPaletteId
-
-        if (showSelectedPreview) {
-            drawRect(
-                color = Color.White,
-                topLeft = cellTopLeft,
-                size = cellSize,
-            )
-            drawCheckerboardPreviewRect(cellTopLeft, cellSize)
-        } else {
-            val fillColor = appliedFill
-                ?.let { paletteById[it]?.composeColor }
-                ?: Color(0xFFF7F7F7)
-            drawRect(
-                color = fillColor,
-                topLeft = cellTopLeft,
-                size = cellSize,
-            )
-        }
-
-        val displayNumber = cell.targetPaletteId?.let { paletteNumbers[it] } ?: 0
-        drawCenteredText(
-            text = displayNumber.toString(),
-            point = Offset(
-                x = cellTopLeft.x + (cellSize.width / 2f),
-                y = cellTopLeft.y + (cellSize.height / 2f),
-            ),
-            paint = paint,
-            textSize = textSize,
-            color = PIXEL_DIGIT_COLOR,
-        )
-    }
-
-    for (row in 0..grid.rows) {
-        val y = row * cellHeight
-        drawLine(
-            color = PIXEL_GRID_COLOR,
-            start = transform.toScreen(PuzzlePoint(0f, y)),
-            end = transform.toScreen(PuzzlePoint(puzzle.document.bounds.x, y)),
-            strokeWidth = gridStrokeWidth,
-        )
-    }
-    for (col in 0..grid.cols) {
-        val x = col * cellWidth
-        drawLine(
-            color = PIXEL_GRID_COLOR,
-            start = transform.toScreen(PuzzlePoint(x, 0f)),
-            end = transform.toScreen(PuzzlePoint(x, puzzle.document.bounds.y)),
-            strokeWidth = gridStrokeWidth,
-        )
-    }
-}
-
-private fun DrawScope.drawCheckerboardPreview(path: Path) {
-    drawPath(
-        path = path,
-        color = Color.White,
+    val topLeft = transform.toScreen(PuzzlePoint(0f, 0f))
+    val bottomRight = transform.toScreen(PuzzlePoint(puzzleWidth.toFloat(), puzzleHeight.toFloat()))
+    val destinationWidth = (bottomRight.x - topLeft.x).coerceAtLeast(1f).roundToInt()
+    val destinationHeight = (bottomRight.y - topLeft.y).coerceAtLeast(1f).roundToInt()
+    drawImage(
+        image = bitmap.asImageBitmap(),
+        dstOffset = IntOffset(
+            x = topLeft.x.roundToInt(),
+            y = topLeft.y.roundToInt(),
+        ),
+        dstSize = IntSize(
+            width = destinationWidth,
+            height = destinationHeight,
+        ),
     )
-    val bounds = path.getBounds()
-    clipPath(path) {
-        val startColumn = (bounds.left / CHECKER_TILE_SIZE_PX).toInt() - 1
-        val endColumn = (bounds.right / CHECKER_TILE_SIZE_PX).toInt() + 1
-        val startRow = (bounds.top / CHECKER_TILE_SIZE_PX).toInt() - 1
-        val endRow = (bounds.bottom / CHECKER_TILE_SIZE_PX).toInt() + 1
-
-        for (row in startRow..endRow) {
-            for (column in startColumn..endColumn) {
-                if ((row + column) % 2 == 0) {
-                    continue
-                }
-                drawRect(
-                    color = CHECKER_DARK_COLOR,
-                    topLeft = Offset(
-                        x = column * CHECKER_TILE_SIZE_PX,
-                        y = row * CHECKER_TILE_SIZE_PX,
-                    ),
-                    size = Size(CHECKER_TILE_SIZE_PX, CHECKER_TILE_SIZE_PX),
-                )
-            }
-        }
-    }
-}
-
-private fun DrawScope.drawCheckerboardPreviewRect(
-    topLeft: Offset,
-    size: Size,
-) {
-    val bounds = androidx.compose.ui.geometry.Rect(topLeft, size)
-    val startColumn = (bounds.left / CHECKER_TILE_SIZE_PX).toInt() - 1
-    val endColumn = (bounds.right / CHECKER_TILE_SIZE_PX).toInt() + 1
-    val startRow = (bounds.top / CHECKER_TILE_SIZE_PX).toInt() - 1
-    val endRow = (bounds.bottom / CHECKER_TILE_SIZE_PX).toInt() + 1
-
-    for (row in startRow..endRow) {
-        for (column in startColumn..endColumn) {
-            if ((row + column) % 2 == 0) {
-                continue
-            }
-            val tileLeft = column * CHECKER_TILE_SIZE_PX
-            val tileTop = row * CHECKER_TILE_SIZE_PX
-            val clippedLeft = maxOf(tileLeft, bounds.left)
-            val clippedTop = maxOf(tileTop, bounds.top)
-            val clippedRight = minOf(tileLeft + CHECKER_TILE_SIZE_PX, bounds.right)
-            val clippedBottom = minOf(tileTop + CHECKER_TILE_SIZE_PX, bounds.bottom)
-            if (clippedRight <= clippedLeft || clippedBottom <= clippedTop) {
-                continue
-            }
-            drawRect(
-                color = CHECKER_DARK_COLOR,
-                topLeft = Offset(clippedLeft, clippedTop),
-                size = Size(clippedRight - clippedLeft, clippedBottom - clippedTop),
-            )
-        }
-    }
-}
-
-private fun shapePath(shape: RenderShape, transform: ScreenTransform): Path {
-    val path = Path().apply {
-        fillType = PathFillType.EvenOdd
-    }
-
-    addContour(path, shape.outer, transform)
-    shape.holes.forEach { hole ->
-        addContour(path, hole, transform)
-    }
-    return path
-}
-
-private fun addContour(path: Path, points: List<PuzzlePoint>, transform: ScreenTransform) {
-    points.forEachIndexed { index, point ->
-        val mapped = transform.toScreen(point)
-        if (index == 0) {
-            path.moveTo(mapped.x, mapped.y)
-        } else {
-            path.lineTo(mapped.x, mapped.y)
-        }
-    }
-    path.close()
 }
 
 @Composable
@@ -758,6 +509,11 @@ private fun PaletteStrip(
     onPaletteSelected: (Int) -> Unit,
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Text(
+            text = stringResource(R.string.palette_title),
+            style = MaterialTheme.typography.titleSmall,
+            fontWeight = FontWeight.SemiBold,
+        )
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -776,7 +532,7 @@ private fun PaletteStrip(
                             .clickable { onPaletteSelected(paletteColor.id) }
                             .size(40.dp)
                             .border(
-                                width = if (isSelected) 5.dp else 1.dp,
+                                width = if (isSelected) 4.dp else 1.dp,
                                 color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline,
                                 shape = MaterialTheme.shapes.small,
                             )
@@ -786,8 +542,8 @@ private fun PaletteStrip(
                             ),
                     )
                     Text(
-                        text = paletteColor.id.toString(),
-                        style = MaterialTheme.typography.labelMedium,
+                        text = paletteColor.label,
+                        style = MaterialTheme.typography.labelSmall,
                         fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
                     )
                 }
@@ -856,7 +612,3 @@ private data class PuzzleViewport(
 
 private const val MIN_ZOOM = 1f
 private const val MAX_ZOOM = 6f
-private const val CHECKER_TILE_SIZE_PX = 16f
-private val CHECKER_DARK_COLOR = Color(0xFFD2D2D2)
-private val PIXEL_GRID_COLOR = Color(0xFFD9D9D9)
-private val PIXEL_DIGIT_COLOR = Color(0xFFBDBDBD)
