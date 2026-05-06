@@ -20,6 +20,9 @@ data class SvgPuzzle(
     val width: Int,
     val height: Int,
     val lineBitmap: Bitmap,
+    val lineSvg: SVG,
+    val lineSvgWidth: Int,
+    val lineSvgHeight: Int,
     val palette: List<PaletteColor>,
     val regionLabels: IntArray,
     val regions: List<SvgRegion>,
@@ -35,8 +38,54 @@ data class SvgPuzzle(
             maxY = height.toFloat(),
         )
 
+    private fun hasFilledPlayableNeighbor(
+        x: Int,
+        y: Int,
+        regionId: Int,
+        filledRegionIds: Set<Int>,
+    ): Boolean {
+        if (x > 0) {
+            val neighborRegionId = regionLabels[(y * width) + (x - 1)]
+            if (neighborRegionId != NO_REGION_ID && neighborRegionId != regionId) {
+                val neighborRegion = regions[neighborRegionId]
+                if (neighborRegion.isPlayable && filledRegionIds.contains(neighborRegion.id)) {
+                    return true
+                }
+            }
+        }
+        if (x + 1 < width) {
+            val neighborRegionId = regionLabels[(y * width) + (x + 1)]
+            if (neighborRegionId != NO_REGION_ID && neighborRegionId != regionId) {
+                val neighborRegion = regions[neighborRegionId]
+                if (neighborRegion.isPlayable && filledRegionIds.contains(neighborRegion.id)) {
+                    return true
+                }
+            }
+        }
+        if (y > 0) {
+            val neighborRegionId = regionLabels[((y - 1) * width) + x]
+            if (neighborRegionId != NO_REGION_ID && neighborRegionId != regionId) {
+                val neighborRegion = regions[neighborRegionId]
+                if (neighborRegion.isPlayable && filledRegionIds.contains(neighborRegion.id)) {
+                    return true
+                }
+            }
+        }
+        if (y + 1 < height) {
+            val neighborRegionId = regionLabels[((y + 1) * width) + x]
+            if (neighborRegionId != NO_REGION_ID && neighborRegionId != regionId) {
+                val neighborRegion = regions[neighborRegionId]
+                if (neighborRegion.isPlayable && filledRegionIds.contains(neighborRegion.id)) {
+                    return true
+                }
+            }
+        }
+        return false
+    }
+
     fun composeDisplayBitmap(session: PuzzleSession): Bitmap {
         val pixels = IntArray(width * height)
+        val filledRegionIds = session.fillsByRegionId.keys
         for (y in 0 until height) {
             for (x in 0 until width) {
                 val pixelIndex = y * width + x
@@ -46,8 +95,14 @@ data class SvgPuzzle(
                     else -> {
                         val region = regions[regionId]
                         when {
-                            !region.isPlayable -> region.targetColor
-                            session.fillsByRegionId.containsKey(region.id) -> region.targetColor
+                            !region.isPlayable -> {
+                                if (hasFilledPlayableNeighbor(x, y, regionId, filledRegionIds)) {
+                                    region.targetColor
+                                } else {
+                                    Color.WHITE
+                                }
+                            }
+                            filledRegionIds.contains(region.id) -> region.targetColor
                             region.targetPaletteId == session.selectedPaletteId -> checkerColor(x, y)
                             else -> Color.WHITE
                         }
@@ -111,6 +166,7 @@ class SvgPuzzleAssetLoader(
         val linesSvg = readText(resolvedPaths.linesAssetPath)
         val sanitizedColorsSvg = stripGroupById(colorsSvg, "vector-lines") ?: colorsSvg
 
+        val lineSource = parseSvgSource(linesSvg)
         val gameplayBitmap = renderSvgBitmap(sanitizedColorsSvg, backgroundColor = null)
         val lineBitmap = renderSvgBitmap(
             linesSvg,
@@ -129,6 +185,9 @@ class SvgPuzzleAssetLoader(
             width = gameplayBitmap.width,
             height = gameplayBitmap.height,
             lineBitmap = lineBitmap,
+            lineSvg = lineSource.svg,
+            lineSvgWidth = lineSource.width,
+            lineSvgHeight = lineSource.height,
             palette = analyzedPuzzle.palette,
             regionLabels = analyzedPuzzle.regionLabels,
             regions = analyzedPuzzle.regions,
