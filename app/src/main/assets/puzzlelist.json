@@ -9,4 +9,10 @@
     "displayName": "Cat 1",
     "assetPath": "cat1"
   }
+,
+  {
+    "id": "rabbit1",
+    "displayName": "Rabbit 1",
+    "assetPath": "rabbit1"
+  }
 ]
