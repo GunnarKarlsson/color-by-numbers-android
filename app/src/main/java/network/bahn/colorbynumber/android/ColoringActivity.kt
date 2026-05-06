@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.Paint
+import android.graphics.RectF
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -428,6 +429,12 @@ private fun SvgPuzzleCanvas(
         baseTransform?.applyViewport(viewport)
     }
     val currentTransform by rememberUpdatedState(transform)
+    val viewportRect = remember(baseTransform, puzzle.width, puzzle.height) {
+        baseTransform?.imageRect(
+            puzzleWidth = puzzle.width,
+            puzzleHeight = puzzle.height,
+        )
+    }
 
     Canvas(
         modifier = modifier
@@ -436,7 +443,14 @@ private fun SvgPuzzleCanvas(
                 detectTransformGestures { centroid, gesturePan, gestureZoom, _ ->
                     val currentBaseTransform = baseTransform ?: return@detectTransformGestures
                     val oldZoom = viewport.zoom
-                    val newZoom = (oldZoom * gestureZoom).coerceIn(MIN_ZOOM, MAX_ZOOM)
+                    val effectiveGestureZoom = if (
+                        kotlin.math.abs(gestureZoom - 1f) < ZOOM_GESTURE_DEADZONE
+                    ) {
+                        1f
+                    } else {
+                        gestureZoom
+                    }
+                    val newZoom = (oldZoom * effectiveGestureZoom).coerceIn(MIN_ZOOM, MAX_ZOOM)
                     val scaleFactor = newZoom / oldZoom
                     val currentTransform = currentBaseTransform.applyViewport(viewport)
                     val currentOffset = Offset(currentTransform.offsetX, currentTransform.offsetY)
@@ -446,12 +460,17 @@ private fun SvgPuzzleCanvas(
                         y = centroid.y - ((centroid.y - currentOffset.y) * scaleFactor) + gesturePan.y,
                     )
 
-                    viewport = PuzzleViewport(
-                        zoom = newZoom,
-                        pan = Offset(
-                            x = newEffectiveOffset.x - baseOffset.x,
-                            y = newEffectiveOffset.y - baseOffset.y,
+                    viewport = constrainViewport(
+                        viewport = PuzzleViewport(
+                            zoom = newZoom,
+                            pan = Offset(
+                                x = newEffectiveOffset.x - baseOffset.x,
+                                y = newEffectiveOffset.y - baseOffset.y,
+                            ),
                         ),
+                        baseTransform = currentBaseTransform,
+                        puzzleWidth = puzzle.width,
+                        puzzleHeight = puzzle.height,
                     )
                 }
             }
@@ -469,12 +488,14 @@ private fun SvgPuzzleCanvas(
         drawPuzzleBitmap(
             bitmap = imageBitmap,
             transform = currentTransform,
+            viewportRect = viewportRect,
             puzzleWidth = puzzle.width,
             puzzleHeight = puzzle.height,
         )
         drawPuzzleBitmap(
             bitmap = puzzle.lineBitmap,
             transform = currentTransform,
+            viewportRect = viewportRect,
             puzzleWidth = puzzle.width,
             puzzleHeight = puzzle.height,
             paint = VIEWPORT_BITMAP_PAINT,
@@ -485,23 +506,20 @@ private fun SvgPuzzleCanvas(
 private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawPuzzleBitmap(
     bitmap: android.graphics.Bitmap,
     transform: ScreenTransform,
+    viewportRect: RectF?,
     puzzleWidth: Int,
     puzzleHeight: Int,
     paint: Paint? = null,
 ) {
-    val topLeft = transform.toScreen(PuzzlePoint(0f, 0f))
-    val bottomRight = transform.toScreen(PuzzlePoint(puzzleWidth.toFloat(), puzzleHeight.toFloat()))
-    val destination = android.graphics.RectF(
-        topLeft.x,
-        topLeft.y,
-        bottomRight.x,
-        bottomRight.y,
+    val destination = transform.imageRect(
+        puzzleWidth = puzzleWidth,
+        puzzleHeight = puzzleHeight,
     )
 
     drawIntoCanvas { canvas ->
         val nativeCanvas = canvas.nativeCanvas
         nativeCanvas.save()
-        nativeCanvas.clipRect(destination)
+        viewportRect?.let(nativeCanvas::clipRect)
         nativeCanvas.drawBitmap(bitmap, null, destination, paint)
         nativeCanvas.restore()
     }
@@ -590,6 +608,17 @@ private data class ScreenTransform(
             offsetY = offsetY + viewport.pan.y,
         )
 
+    fun imageRect(puzzleWidth: Int, puzzleHeight: Int): RectF {
+        val topLeft = toScreen(PuzzlePoint(0f, 0f))
+        val bottomRight = toScreen(PuzzlePoint(puzzleWidth.toFloat(), puzzleHeight.toFloat()))
+        return RectF(
+            topLeft.x,
+            topLeft.y,
+            bottomRight.x,
+            bottomRight.y,
+        )
+    }
+
     companion object {
         fun fit(canvasSize: Size, bounds: PuzzleBounds, padding: Float): ScreenTransform {
             val availableWidth = (canvasSize.width - (padding * 2f)).coerceAtLeast(1f)
@@ -617,5 +646,26 @@ private data class PuzzleViewport(
 
 private const val MIN_ZOOM = 1f
 private const val MAX_ZOOM = 6f
+private const val ZOOM_GESTURE_DEADZONE = 0.02f
 
 private val VIEWPORT_BITMAP_PAINT = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
+
+private fun constrainViewport(
+    viewport: PuzzleViewport,
+    baseTransform: ScreenTransform,
+    puzzleWidth: Int,
+    puzzleHeight: Int,
+): PuzzleViewport {
+    val baseRect = baseTransform.imageRect(
+        puzzleWidth = puzzleWidth,
+        puzzleHeight = puzzleHeight,
+    )
+    val minPanX = baseRect.width() * (1f - viewport.zoom)
+    val minPanY = baseRect.height() * (1f - viewport.zoom)
+    return viewport.copy(
+        pan = Offset(
+            x = viewport.pan.x.coerceIn(minPanX, 0f),
+            y = viewport.pan.y.coerceIn(minPanY, 0f),
+        ),
+    )
+}
