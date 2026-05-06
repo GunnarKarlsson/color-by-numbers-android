@@ -63,7 +63,6 @@ import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import kotlin.math.max
 import network.bahn.colorbynumber.android.coloring.PaletteColor
 import network.bahn.colorbynumber.android.coloring.PuzzleBounds
 import network.bahn.colorbynumber.android.coloring.PuzzlePoint
@@ -428,25 +427,12 @@ private fun SvgPuzzleCanvas(
     val transform = remember(baseTransform, viewport) {
         baseTransform?.applyViewport(viewport)
     }
-    val lineOverlayBitmap by produceState<Bitmap?>(initialValue = null, puzzle, canvasSize, transform) {
-        val currentTransform = transform
-        if (canvasSize == IntSize.Zero || currentTransform == null) {
-            value = null
-        } else {
-            value = withContext(Dispatchers.Default) {
-                renderLineOverlayBitmap(
-                    puzzle = puzzle,
-                    canvasSize = canvasSize,
-                    transform = currentTransform,
-                )
-            }
-        }
-    }
+    val currentTransform by rememberUpdatedState(transform)
 
     Canvas(
         modifier = modifier
             .onSizeChanged { canvasSize = it }
-            .pointerInput(baseTransform, viewport) {
+            .pointerInput(baseTransform) {
                 detectTransformGestures { centroid, gesturePan, gestureZoom, _ ->
                     val currentBaseTransform = baseTransform ?: return@detectTransformGestures
                     val oldZoom = viewport.zoom
@@ -469,10 +455,10 @@ private fun SvgPuzzleCanvas(
                     )
                 }
             }
-            .pointerInput(transform, puzzle) {
+            .pointerInput(puzzle) {
                 detectTapGestures { offset ->
-                    val currentTransform = transform ?: return@detectTapGestures
-                    currentOnPuzzleTapped(currentTransform.toWorld(offset))
+                    val activeTransform = currentTransform ?: return@detectTapGestures
+                    currentOnPuzzleTapped(activeTransform.toWorld(offset))
                 }
             },
     ) {
@@ -480,23 +466,28 @@ private fun SvgPuzzleCanvas(
         val currentTransform = transform ?: return@Canvas
         val imageBitmap = displayBitmap ?: return@Canvas
 
-        drawBitmapToBounds(
+        drawPuzzleBitmap(
             bitmap = imageBitmap,
             transform = currentTransform,
             puzzleWidth = puzzle.width,
             puzzleHeight = puzzle.height,
         )
-        lineOverlayBitmap?.let { overlayBitmap ->
-            drawViewportBitmap(overlayBitmap)
-        }
+        drawPuzzleBitmap(
+            bitmap = puzzle.lineBitmap,
+            transform = currentTransform,
+            puzzleWidth = puzzle.width,
+            puzzleHeight = puzzle.height,
+            paint = VIEWPORT_BITMAP_PAINT,
+        )
     }
 }
 
-private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawBitmapToBounds(
+private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawPuzzleBitmap(
     bitmap: android.graphics.Bitmap,
     transform: ScreenTransform,
     puzzleWidth: Int,
     puzzleHeight: Int,
+    paint: Paint? = null,
 ) {
     val topLeft = transform.toScreen(PuzzlePoint(0f, 0f))
     val bottomRight = transform.toScreen(PuzzlePoint(puzzleWidth.toFloat(), puzzleHeight.toFloat()))
@@ -508,15 +499,11 @@ private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawBitmapToBounds(
     )
 
     drawIntoCanvas { canvas ->
-        canvas.nativeCanvas.drawBitmap(bitmap, null, destination, null)
-    }
-}
-
-private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawViewportBitmap(
-    bitmap: Bitmap,
-) {
-    drawIntoCanvas { canvas ->
-        canvas.nativeCanvas.drawBitmap(bitmap, 0f, 0f, VIEWPORT_BITMAP_PAINT)
+        val nativeCanvas = canvas.nativeCanvas
+        nativeCanvas.save()
+        nativeCanvas.clipRect(destination)
+        nativeCanvas.drawBitmap(bitmap, null, destination, paint)
+        nativeCanvas.restore()
     }
 }
 
@@ -632,28 +619,3 @@ private const val MIN_ZOOM = 1f
 private const val MAX_ZOOM = 6f
 
 private val VIEWPORT_BITMAP_PAINT = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
-
-private fun renderLineOverlayBitmap(
-    puzzle: SvgPuzzle,
-    canvasSize: IntSize,
-    transform: ScreenTransform,
-): Bitmap {
-    val bitmap = Bitmap.createBitmap(
-        max(canvasSize.width, 1),
-        max(canvasSize.height, 1),
-        Bitmap.Config.ARGB_8888,
-    )
-    val canvas = android.graphics.Canvas(bitmap)
-    val topLeft = transform.toScreen(PuzzlePoint(0f, 0f))
-    val bottomRight = transform.toScreen(PuzzlePoint(puzzle.width.toFloat(), puzzle.height.toFloat()))
-    val destination = android.graphics.RectF(
-        topLeft.x,
-        topLeft.y,
-        bottomRight.x,
-        bottomRight.y,
-    )
-
-    puzzle.lineSvg.renderToCanvas(canvas, destination)
-
-    return bitmap
-}

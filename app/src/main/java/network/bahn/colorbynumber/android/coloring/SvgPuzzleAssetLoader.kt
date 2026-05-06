@@ -19,9 +19,7 @@ data class SvgPuzzle(
     val assetPath: String,
     val width: Int,
     val height: Int,
-    val lineSvg: SVG,
-    val lineSvgWidth: Int,
-    val lineSvgHeight: Int,
+    val lineBitmap: Bitmap,
     val palette: List<PaletteColor>,
     val regionLabels: IntArray,
     val regions: List<SvgRegion>,
@@ -113,8 +111,13 @@ class SvgPuzzleAssetLoader(
         val linesSvg = readText(resolvedPaths.linesAssetPath)
         val sanitizedColorsSvg = stripGroupById(colorsSvg, "vector-lines") ?: colorsSvg
 
-        val lineSource = parseSvgSource(linesSvg)
         val gameplayBitmap = renderSvgBitmap(sanitizedColorsSvg, backgroundColor = null)
+        val lineBitmap = renderSvgBitmap(
+            linesSvg,
+            backgroundColor = null,
+            targetWidth = gameplayBitmap.width,
+            targetHeight = gameplayBitmap.height,
+        )
         val analyzedPuzzle = analyzeSvgPuzzle(
             renderedBitmap = gameplayBitmap,
             paletteCandidates = extractDeclaredPalette(sanitizedColorsSvg),
@@ -125,9 +128,7 @@ class SvgPuzzleAssetLoader(
             assetPath = assetPath,
             width = gameplayBitmap.width,
             height = gameplayBitmap.height,
-            lineSvg = lineSource.svg,
-            lineSvgWidth = lineSource.width,
-            lineSvgHeight = lineSource.height,
+            lineBitmap = lineBitmap,
             palette = analyzedPuzzle.palette,
             regionLabels = analyzedPuzzle.regionLabels,
             regions = analyzedPuzzle.regions,
@@ -209,11 +210,16 @@ class SvgPuzzleAssetLoader(
         )
     }
 
-    private fun renderSvgBitmap(svgText: String, backgroundColor: Int?): Bitmap {
+    private fun renderSvgBitmap(
+        svgText: String,
+        backgroundColor: Int?,
+        targetWidth: Int? = null,
+        targetHeight: Int? = null,
+    ): Bitmap {
         val svgSource = parseSvgSource(svgText)
         val svg = svgSource.svg
-        val width = svgSource.width
-        val height = svgSource.height
+        val width = targetWidth ?: svgSource.width
+        val height = targetHeight ?: svgSource.height
         val picture = svg.renderToPicture(width, height)
 
         return Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888).apply {
