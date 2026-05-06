@@ -19,7 +19,9 @@ data class SvgPuzzle(
     val assetPath: String,
     val width: Int,
     val height: Int,
-    val lineBitmap: Bitmap,
+    val lineSvg: SVG,
+    val lineSvgWidth: Int,
+    val lineSvgHeight: Int,
     val palette: List<PaletteColor>,
     val regionLabels: IntArray,
     val regions: List<SvgRegion>,
@@ -111,7 +113,7 @@ class SvgPuzzleAssetLoader(
         val linesSvg = readText(resolvedPaths.linesAssetPath)
         val sanitizedColorsSvg = stripGroupById(colorsSvg, "vector-lines") ?: colorsSvg
 
-        val lineBitmap = renderSvgBitmap(linesSvg, backgroundColor = null)
+        val lineSource = parseSvgSource(linesSvg)
         val gameplayBitmap = renderSvgBitmap(sanitizedColorsSvg, backgroundColor = null)
         val analyzedPuzzle = analyzeSvgPuzzle(
             renderedBitmap = gameplayBitmap,
@@ -123,7 +125,9 @@ class SvgPuzzleAssetLoader(
             assetPath = assetPath,
             width = gameplayBitmap.width,
             height = gameplayBitmap.height,
-            lineBitmap = lineBitmap,
+            lineSvg = lineSource.svg,
+            lineSvgWidth = lineSource.width,
+            lineSvgHeight = lineSource.height,
             palette = analyzedPuzzle.palette,
             regionLabels = analyzedPuzzle.regionLabels,
             regions = analyzedPuzzle.regions,
@@ -206,15 +210,10 @@ class SvgPuzzleAssetLoader(
     }
 
     private fun renderSvgBitmap(svgText: String, backgroundColor: Int?): Bitmap {
-        val svg = SVG.getFromString(svgText)
-        val viewBox = svg.documentViewBox ?: RectF(
-            0f,
-            0f,
-            svg.documentWidth.takeIf { it > 0f } ?: 1f,
-            svg.documentHeight.takeIf { it > 0f } ?: 1f,
-        )
-        val width = ceil(viewBox.width().coerceAtLeast(1f).toDouble()).toInt()
-        val height = ceil(viewBox.height().coerceAtLeast(1f).toDouble()).toInt()
+        val svgSource = parseSvgSource(svgText)
+        val svg = svgSource.svg
+        val width = svgSource.width
+        val height = svgSource.height
         val picture = svg.renderToPicture(width, height)
 
         return Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888).apply {
@@ -225,6 +224,29 @@ class SvgPuzzleAssetLoader(
             canvas.drawPicture(picture)
         }
     }
+}
+
+private data class ParsedSvgSource(
+    val svg: SVG,
+    val width: Int,
+    val height: Int,
+)
+
+private fun parseSvgSource(svgText: String): ParsedSvgSource {
+    val svg = SVG.getFromString(svgText)
+    val viewBox = svg.documentViewBox ?: RectF(
+        0f,
+        0f,
+        svg.documentWidth.takeIf { it > 0f } ?: 1f,
+        svg.documentHeight.takeIf { it > 0f } ?: 1f,
+    )
+    val width = ceil(viewBox.width().coerceAtLeast(1f).toDouble()).toInt()
+    val height = ceil(viewBox.height().coerceAtLeast(1f).toDouble()).toInt()
+    return ParsedSvgSource(
+        svg = svg,
+        width = width,
+        height = height,
+    )
 }
 
 private data class ResolvedSvgPuzzleAssets(

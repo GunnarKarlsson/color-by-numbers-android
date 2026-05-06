@@ -2,6 +2,8 @@ package network.bahn.colorbynumber.android
 
 import android.content.Context
 import android.content.Intent
+import android.graphics.Bitmap
+import android.graphics.Paint
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -51,8 +53,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.asImageBitmap
-import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
+import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.res.stringResource
@@ -61,7 +63,7 @@ import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import kotlin.math.roundToInt
+import kotlin.math.max
 import network.bahn.colorbynumber.android.coloring.PaletteColor
 import network.bahn.colorbynumber.android.coloring.PuzzleBounds
 import network.bahn.colorbynumber.android.coloring.PuzzlePoint
@@ -426,6 +428,20 @@ private fun SvgPuzzleCanvas(
     val transform = remember(baseTransform, viewport) {
         baseTransform?.applyViewport(viewport)
     }
+    val lineOverlayBitmap by produceState<Bitmap?>(initialValue = null, puzzle, canvasSize, transform) {
+        val currentTransform = transform
+        if (canvasSize == IntSize.Zero || currentTransform == null) {
+            value = null
+        } else {
+            value = withContext(Dispatchers.Default) {
+                renderLineOverlayBitmap(
+                    puzzle = puzzle,
+                    canvasSize = canvasSize,
+                    transform = currentTransform,
+                )
+            }
+        }
+    }
 
     Canvas(
         modifier = modifier
@@ -470,12 +486,9 @@ private fun SvgPuzzleCanvas(
             puzzleWidth = puzzle.width,
             puzzleHeight = puzzle.height,
         )
-        drawBitmapToBounds(
-            bitmap = puzzle.lineBitmap,
-            transform = currentTransform,
-            puzzleWidth = puzzle.width,
-            puzzleHeight = puzzle.height,
-        )
+        lineOverlayBitmap?.let { overlayBitmap ->
+            drawViewportBitmap(overlayBitmap)
+        }
     }
 }
 
@@ -487,19 +500,24 @@ private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawBitmapToBounds(
 ) {
     val topLeft = transform.toScreen(PuzzlePoint(0f, 0f))
     val bottomRight = transform.toScreen(PuzzlePoint(puzzleWidth.toFloat(), puzzleHeight.toFloat()))
-    val destinationWidth = (bottomRight.x - topLeft.x).coerceAtLeast(1f).roundToInt()
-    val destinationHeight = (bottomRight.y - topLeft.y).coerceAtLeast(1f).roundToInt()
-    drawImage(
-        image = bitmap.asImageBitmap(),
-        dstOffset = IntOffset(
-            x = topLeft.x.roundToInt(),
-            y = topLeft.y.roundToInt(),
-        ),
-        dstSize = IntSize(
-            width = destinationWidth,
-            height = destinationHeight,
-        ),
+    val destination = android.graphics.RectF(
+        topLeft.x,
+        topLeft.y,
+        bottomRight.x,
+        bottomRight.y,
     )
+
+    drawIntoCanvas { canvas ->
+        canvas.nativeCanvas.drawBitmap(bitmap, null, destination, null)
+    }
+}
+
+private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawViewportBitmap(
+    bitmap: Bitmap,
+) {
+    drawIntoCanvas { canvas ->
+        canvas.nativeCanvas.drawBitmap(bitmap, 0f, 0f, VIEWPORT_BITMAP_PAINT)
+    }
 }
 
 @Composable
@@ -612,3 +630,34 @@ private data class PuzzleViewport(
 
 private const val MIN_ZOOM = 1f
 private const val MAX_ZOOM = 6f
+
+private val VIEWPORT_BITMAP_PAINT = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
+
+private fun renderLineOverlayBitmap(
+    puzzle: SvgPuzzle,
+    canvasSize: IntSize,
+    transform: ScreenTransform,
+): Bitmap {
+    val bitmap = Bitmap.createBitmap(
+        max(canvasSize.width, 1),
+        max(canvasSize.height, 1),
+        Bitmap.Config.ARGB_8888,
+    )
+    val canvas = android.graphics.Canvas(bitmap)
+
+    val sourceWidth = puzzle.lineSvgWidth.coerceAtLeast(1)
+    val sourceHeight = puzzle.lineSvgHeight.coerceAtLeast(1)
+    val overlayScaleX = puzzle.width.toFloat() / sourceWidth.toFloat()
+    val overlayScaleY = puzzle.height.toFloat() / sourceHeight.toFloat()
+
+    canvas.save()
+    canvas.translate(transform.offsetX, transform.offsetY)
+    canvas.scale(
+        transform.scale * overlayScaleX,
+        transform.scale * overlayScaleY,
+    )
+    puzzle.lineSvg.renderToCanvas(canvas)
+    canvas.restore()
+
+    return bitmap
+}
