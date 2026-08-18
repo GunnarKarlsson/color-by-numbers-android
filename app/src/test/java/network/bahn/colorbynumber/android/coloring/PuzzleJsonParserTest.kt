@@ -21,7 +21,7 @@ class PuzzleJsonParserTest {
                 ],
                 "palette_link": {
                   "palette_id": "palette-123",
-                  "path": "palette_1.cbnpalette"
+                  "path": "palettes/palette1.cbnpalette"
                 }
               },
               "image_curve_data": {
@@ -74,7 +74,7 @@ class PuzzleJsonParserTest {
         assertEquals(2, document.regions.first().targetPaletteId)
         assertNull(document.regions.last().targetPaletteId)
         assertEquals("palette-123", document.paletteLink?.paletteId)
-        assertEquals("palette_1.cbnpalette", document.paletteLink?.path)
+        assertEquals("palettes/palette1.cbnpalette", document.paletteLink?.path)
         assertEquals(1, document.embeddedPalette.size)
         assertNull(document.pixelGrid)
         assertEquals(1, document.topology.edges.size)
@@ -130,7 +130,7 @@ class PuzzleJsonParserTest {
             {
               "version": 1,
               "palette_id": "palette-123",
-              "name": "palette_1",
+              "name": "palette1",
               "colors": [
                 {
                   "id": 1,

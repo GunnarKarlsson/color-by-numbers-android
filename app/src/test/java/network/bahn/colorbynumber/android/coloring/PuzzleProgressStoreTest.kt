@@ -15,14 +15,14 @@ class PuzzleProgressStoreTest {
             val store = PuzzleProgressStore(tempDir.toFile())
 
             store.saveProgress(
-                assetPath = "puzzles/topology_new_3.cbn",
+                assetPath = "puzzles/sample.cbn",
                 fillsByRegionId = mapOf(9 to 6, 3 to 4),
                 totalRegions = 8,
             )
 
-            val progressFile = store.progressFileFor("puzzles/topology_new_3.cbn")
+            val progressFile = store.progressFileFor("puzzles/sample.cbn")
             assertTrue(progressFile.exists())
-            assertEquals("topology_new_3.cbn.progress.json", progressFile.name)
+            assertEquals("sample.cbn.progress.json", progressFile.name)
             assertTrue(progressFile.readText().contains("\"completed_regions\": 2"))
             assertTrue(progressFile.readText().contains("\"total_regions\": 8"))
             assertTrue(progressFile.readText().contains("\"region_id\": 3"))
